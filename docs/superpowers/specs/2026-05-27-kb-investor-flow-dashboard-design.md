@@ -435,3 +435,8 @@ C:\Users\suble\Desktop\work\project\kb-investor-flow\
   Section 2.1 / 5.4의 raw URL은 다음으로 대체:
   - 사이트: `https://cdn.jsdelivr.net/gh/<USER>/<REPO>@data/data/${today}.json`
   - 구현은 commit `a011165` 참고.
+- 2026-05-27 (구현 단계) — **트리거 방식을 Windows Task Scheduler → 상시 데몬으로 변경.**
+  Task Scheduler는 분당 콘솔 창이 점멸하는 UX 문제 + gh CLI 활성 계정 전환 시 push 403 발생.
+  `collect/daemon.py` 로 단일 콘솔 상주 프로세스 채용 — 매 분 정각에 거래시간 체크 후
+  collect_once 호출, 거래시간 외엔 sleep. 예외는 catch하여 다음 분에 자가 회복.
+  거래시간 윈도우는 08:50–15:40 KST 평일.

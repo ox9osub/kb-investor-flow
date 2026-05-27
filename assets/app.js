@@ -156,5 +156,49 @@ function setInstitutionLines(market, data) {
   });
 }
 
-function setNetBar() {}
-function setVolumeBar() {}
+function latestTopLevel(data, market, category) {
+  const snaps = data.snapshots;
+  if (!snaps.length) return null;
+  return snaps[snaps.length - 1][market]?.[category] || null;
+}
+
+function setNetBar(market, data) {
+  const chart = charts[market].netBar;
+  if (!chart) return;
+  const values = MAIN_CATEGORIES.map(cat => {
+    const v = latestTopLevel(data, market, cat);
+    return v ? v.순매수 : 0;
+  });
+  chart.setOption({
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+    grid: { top: 16, left: 80, right: 32, bottom: 32 },
+    xAxis: { type: "value", name: "억원" },
+    yAxis: { type: "category", data: MAIN_CATEGORIES, inverse: true },
+    series: [{
+      type: "bar",
+      data: values.map(v => ({
+        value: v,
+        itemStyle: { color: v >= 0 ? "#43a047" : "#e53935" },
+      })),
+      label: { show: true, position: "right", formatter: ({value}) => value.toLocaleString() },
+    }],
+  });
+}
+
+function setVolumeBar(market, data) {
+  const chart = charts[market].volumeBar;
+  if (!chart) return;
+  const sells = MAIN_CATEGORIES.map(cat => latestTopLevel(data, market, cat)?.매도 || 0);
+  const buys  = MAIN_CATEGORIES.map(cat => latestTopLevel(data, market, cat)?.매수 || 0);
+  chart.setOption({
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+    legend: { top: 0, data: ["매도", "매수"] },
+    grid: { top: 40, left: 60, right: 24, bottom: 32 },
+    xAxis: { type: "category", data: MAIN_CATEGORIES },
+    yAxis: { type: "value", name: "억원" },
+    series: [
+      { name: "매도", type: "bar", data: sells, itemStyle: { color: "#ef9a9a" } },
+      { name: "매수", type: "bar", data: buys,  itemStyle: { color: "#a5d6a7" } },
+    ],
+  });
+}

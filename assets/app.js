@@ -1,6 +1,6 @@
 const REFRESH_MS = 60_000;
-const USE_MOCK = true;
-const RAW_BASE = "https://raw.githubusercontent.com/<USER>/<REPO>/data";
+const USE_MOCK = false;
+const RAW_BASE = "https://raw.githubusercontent.com/ox9osub/kb-investor-flow/data";
 
 const charts = { kospi: {}, kosdaq: {} };
 let currentMarket = "kospi";

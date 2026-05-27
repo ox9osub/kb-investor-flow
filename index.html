@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KB 투자자별 매매동향 실시간</title>
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <h1>KB 투자자별 매매동향 실시간</h1>
+    <div class="meta">
+      <span>마지막 업데이트: <time id="updated">-</time> KST</span>
+      <span class="sep">|</span>
+      <span>단위: 억원</span>
+      <span class="sep">|</span>
+      <span>자동 새로고침 60s</span>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" role="tab" data-market="kospi" aria-selected="true">KOSPI</button>
+    <button class="tab"        role="tab" data-market="kosdaq" aria-selected="false">KOSDAQ</button>
+  </nav>
+
+  <main>
+    <section class="market-panel" data-market="kospi">
+      <h2>주요 4분류 순매수 추이</h2>
+      <div class="chart" data-chart="mainLines"></div>
+
+      <h2>기관 세부 8분류 순매수 추이</h2>
+      <div class="chart" data-chart="institutionLines"></div>
+
+      <div class="snapshot-row">
+        <div>
+          <h2>현재 순매수</h2>
+          <div class="chart half" data-chart="netBar"></div>
+        </div>
+        <div>
+          <h2>매도 vs 매수</h2>
+          <div class="chart half" data-chart="volumeBar"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="market-panel hidden" data-market="kosdaq">
+      <h2>주요 4분류 순매수 추이</h2>
+      <div class="chart" data-chart="mainLines"></div>
+
+      <h2>기관 세부 8분류 순매수 추이</h2>
+      <div class="chart" data-chart="institutionLines"></div>
+
+      <div class="snapshot-row">
+        <div>
+          <h2>현재 순매수</h2>
+          <div class="chart half" data-chart="netBar"></div>
+        </div>
+        <div>
+          <h2>매도 vs 매수</h2>
+          <div class="chart half" data-chart="volumeBar"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

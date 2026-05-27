@@ -17,33 +17,84 @@ GitHub Pages의 정적 사이트에서 ECharts로 시계열·스냅샷 차트로
 ## 데이터 흐름
 
 ```
-[Local PC] daemon.py (상시 실행) → 매 분 정각 거래시간 체크
-                                    ↓ (08:50–15:40 KST 평일)
+[Local PC] daemon.py (콘솔 상시 실행) → 매 분 정각 거래시간 체크
+                                          ↓ (평일 08:50–15:40 KST 만)
                        KB 페이지 fetch → 파싱 → JSON append → git push (data 브랜치)
                                                                     ↓ push 직후 purge.jsdelivr.net 호출
 [GitHub] data 브랜치 → cdn.jsdelivr.net/gh/<USER>/<REPO>@data (CORS + 5초 내 fresh)
 [GitHub] main 브랜치 → GitHub Pages → 정적 사이트 → fetch jsdelivr → ECharts 갱신
 ```
 
-## 로컬 셋업 (수집기)
+## 초기 셋업 (새 PC / 처음 클론 시)
 
-상세 안내: [collect/README.md](collect/README.md). 요약:
+```powershell
+# 1. 리포 클론
+git clone https://github.com/ox9osub/kb-investor-flow.git
+cd kb-investor-flow
 
-1. Python 3.10+ 설치 후 프로젝트 루트에 venv 생성 + 의존성:
-   ```powershell
-   python -m venv .venv
-   .\.venv\Scripts\pip install -r collect\requirements.txt
-   ```
-2. data 브랜치를 sibling 디렉토리에 worktree:
-   `git worktree add ../kb-investor-flow-data data`
-3. 1회 검증: `.\.venv\Scripts\python.exe collect\collect.py --dry-run`
-4. 상시 데몬 실행: `.\.venv\Scripts\python.exe collect\daemon.py`
-   콘솔 1개 열어두면 24/7 동작. 거래시간(평일 08:50–15:40 KST) 동안만 실제 수집,
-   그 외엔 sleep. Ctrl+C로 종료.
+# 2. Python venv 생성 + 의존성 설치
+python -m venv .venv
+.\.venv\Scripts\pip install -r collect\requirements.txt
+
+# 3. data 브랜치를 sibling 디렉토리에 worktree로 체크아웃
+git worktree add ..\kb-investor-flow-data data
+
+# 4. 1회 dry-run으로 동작 확인 (네트워크는 호출, 파일/git은 안 건드림)
+.\.venv\Scripts\python.exe collect\collect.py --dry-run
+```
+
+`.venv\`는 `.gitignore`에 포함되어 commit되지 않습니다. PC마다 새로 만드세요.
+
+## 운영 (수집기 가동)
+
+콘솔(PowerShell 또는 cmd) 창 1개를 열고 다음을 실행하면 데몬이 24/7 상주합니다:
+
+```powershell
+cd C:\Users\suble\Desktop\work\project\kb-investor-flow
+.\.venv\Scripts\python.exe collect\daemon.py
+```
+
+**동작 방식 (`collect/daemon.py`):**
+- 매 분 정각(`:00`초)에 깨어남
+- 평일 **08:50–15:40 KST** 구간이면 → `collect_once()` 호출 (fetch + parse + push + jsdelivr purge)
+- 그 외 시간(주말·공휴일·장 외 시간) → 조용히 sleep, 매시 정각만 `idle` 로그
+- 예외 발생해도 데몬 자체는 죽지 않음 — 다음 분에 자가 회복
+- 종료: `Ctrl+C`
+
+콘솔 창은 그냥 띄워 두기만 하면 됨. 다른 작업 해도 백그라운드에서 매 분 갱신.
+PC 재부팅 시에는 창을 다시 띄워야 합니다.
+
+## 디버깅용 1회 실행
+
+`daemon.py`를 안 띄우고 한 사이클만 수동 실행하고 싶을 때:
+
+```powershell
+# 파싱 결과만 stdout, 파일/git 손대지 않음 (가장 안전)
+.\.venv\Scripts\python.exe collect\collect.py --dry-run
+
+# 파일은 저장하되 git push는 안 함
+.\.venv\Scripts\python.exe collect\collect.py --no-push
+
+# 평소 한 사이클 그대로 (데몬이 매분 하는 것과 동일)
+.\.venv\Scripts\python.exe collect\collect.py
+```
+
+## 테스트
+
+```powershell
+cd collect
+..\.venv\Scripts\python.exe -m pytest tests/ -v
+```
+
+13개 테스트 (parse 7 + storage 6) 통과 기준.
 
 ## 로컬 사이트 미리보기
+
+배포 전 차트 확인:
 
 ```powershell
 python -m http.server 8000
 # http://localhost:8000/
 ```
+
+`assets/app.js`가 GitHub의 jsdelivr URL을 fetch하므로 로컬에서도 실데이터로 동작.

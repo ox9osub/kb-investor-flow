@@ -427,3 +427,11 @@ C:\Users\suble\Desktop\work\project\kb-investor-flow\
 ## 11. 변경 로그
 
 - 2026-05-27 — 최초 작성
+- 2026-05-27 (구현 단계) — **데이터 fetch URL을 raw.githubusercontent → cdn.jsdelivr.net/gh 로 변경.**
+  실측 결과 raw 도메인은 Fastly 캐시에서 query string을 정규화해 `?t=<unix>` 캐시버스팅이
+  무효 (5분 stale). jsdelivr는 push 후 `https://purge.jsdelivr.net/gh/<user>/<repo>@<branch>/<path>`
+  를 GET하면 ~5초 내 모든 엣지(CF+Fastly) 캐시 무효화 — 60초 polling interval 내에서 fresh
+  보장. `collect.py` 가 git push 직후 purge 호출 (best-effort, 실패 시 무시).
+  Section 2.1 / 5.4의 raw URL은 다음으로 대체:
+  - 사이트: `https://cdn.jsdelivr.net/gh/<USER>/<REPO>@data/data/${today}.json`
+  - 구현은 commit `a011165` 참고.

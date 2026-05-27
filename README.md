@@ -29,13 +29,17 @@ GitHub Pages의 정적 사이트에서 ECharts로 시계열·스냅샷 차트로
 
 상세 안내: [collect/README.md](collect/README.md). 요약:
 
-1. Python 3.10+ 설치, `pip install -r collect/requirements.txt`
+1. Python 3.10+ 설치 후 프로젝트 루트에 venv 생성 + 의존성:
+   ```powershell
+   python -m venv .venv
+   .\.venv\Scripts\pip install -r collect\requirements.txt
+   ```
 2. data 브랜치를 sibling 디렉토리에 worktree:
    `git worktree add ../kb-investor-flow-data data`
-3. 1회 검증: `cd collect && python collect.py --dry-run`
-4. 상시 데몬 실행: `python collect/daemon.py` — 콘솔 1개 열어두면 24/7 동작.
-   거래시간(평일 08:50–15:40 KST) 동안만 실제 수집, 그 외엔 sleep.
-   Ctrl+C로 종료.
+3. 1회 검증: `.\.venv\Scripts\python.exe collect\collect.py --dry-run`
+4. 상시 데몬 실행: `.\.venv\Scripts\python.exe collect\daemon.py`
+   콘솔 1개 열어두면 24/7 동작. 거래시간(평일 08:50–15:40 KST) 동안만 실제 수집,
+   그 외엔 sleep. Ctrl+C로 종료.
 
 ## 로컬 사이트 미리보기
 

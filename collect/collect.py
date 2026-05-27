@@ -9,6 +9,8 @@ import json
 import sys
 from pathlib import Path
 
+import requests
+
 import fetch
 import git_sync
 import parse
@@ -17,6 +19,16 @@ import storage
 _THIS_DIR = Path(__file__).resolve().parent
 _MAIN_REPO_ROOT = _THIS_DIR.parent
 _DATA_REPO_ROOT = _MAIN_REPO_ROOT.parent / "kb-investor-flow-data"
+
+_PURGE_URL_TEMPLATE = "https://purge.jsdelivr.net/gh/ox9osub/kb-investor-flow@data/{relpath}"
+
+
+def _purge_jsdelivr(relpath: str) -> None:
+    """jsdelivr CDN의 해당 파일 캐시를 즉시 무효화. 실패는 무시 (best-effort)."""
+    try:
+        requests.get(_PURGE_URL_TEMPLATE.format(relpath=relpath), timeout=10)
+    except Exception as e:
+        print(f"WARN: jsdelivr purge failed: {e}", file=sys.stderr)
 
 
 def collect_once(dry_run: bool = False, skip_push: bool = False) -> None:
@@ -50,6 +62,7 @@ def collect_once(dry_run: bool = False, skip_push: bool = False) -> None:
         relpath=rel,
         message=f"data: {date} {ts[11:19]} KST",
     )
+    _purge_jsdelivr(rel)
 
 
 def main() -> None:

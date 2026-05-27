@@ -124,6 +124,37 @@ function setMainLines(market, data) {
     series,
   });
 }
-function setInstitutionLines() {}
+
+const INSTITUTION_SUBS = [
+  "금융투자", "투신", "보험", "사모펀드",
+  "은행", "기타금융", "연기금등", "국가/지자체",
+];
+
+function institutionSubNet(snap, market, sub) {
+  const subs = snap[market]?.["기관"]?.세부;
+  return subs && subs[sub] ? subs[sub].순매수 : null;
+}
+
+function setInstitutionLines(market, data) {
+  const chart = charts[market].institutionLines;
+  if (!chart) return;
+  const series = INSTITUTION_SUBS.map(sub => ({
+    name: sub,
+    type: "line",
+    smooth: true,
+    showSymbol: false,
+    data: data.snapshots.map(s => [s.ts, institutionSubNet(s, market, sub)]),
+  }));
+  chart.setOption({
+    tooltip: { trigger: "axis" },
+    legend: { top: 0, data: INSTITUTION_SUBS, type: "scroll" },
+    grid: { top: 50, left: 60, right: 24, bottom: 60 },
+    xAxis: { type: "time" },
+    yAxis: { type: "value", name: "억원" },
+    dataZoom: [{ type: "slider", bottom: 10, height: 20 }],
+    series,
+  });
+}
+
 function setNetBar() {}
 function setVolumeBar() {}

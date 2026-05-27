@@ -89,7 +89,41 @@ function updateAllCharts(data) {
   }
 }
 
-function setMainLines() {}
+const MAIN_CATEGORIES = ["외국인", "개인", "기관", "기타법인"];
+
+const COLOR = {
+  "외국인":   "#1976d2",
+  "개인":     "#43a047",
+  "기관":     "#e64a19",
+  "기타법인": "#8e24aa",
+};
+
+function topLevelNet(snap, market, category) {
+  const v = snap[market]?.[category];
+  return v ? v.순매수 : null;
+}
+
+function setMainLines(market, data) {
+  const chart = charts[market].mainLines;
+  if (!chart) return;
+  const series = MAIN_CATEGORIES.map(cat => ({
+    name: cat,
+    type: "line",
+    smooth: true,
+    showSymbol: false,
+    itemStyle: { color: COLOR[cat] },
+    data: data.snapshots.map(s => [s.ts, topLevelNet(s, market, cat)]),
+  }));
+  chart.setOption({
+    tooltip: { trigger: "axis" },
+    legend: { top: 0, data: MAIN_CATEGORIES },
+    grid: { top: 40, left: 60, right: 24, bottom: 60 },
+    xAxis: { type: "time" },
+    yAxis: { type: "value", name: "억원" },
+    dataZoom: [{ type: "slider", bottom: 10, height: 20 }],
+    series,
+  });
+}
 function setInstitutionLines() {}
 function setNetBar() {}
 function setVolumeBar() {}

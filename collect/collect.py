@@ -35,19 +35,27 @@ def collect_once(dry_run: bool = False, skip_push: bool = False) -> None:
         ))
         return
 
+    # 1) 누적 파일 — 차트 과거 시계열 본체 (CDN 캐시로 최대 5분 낡을 수 있음)
     rel = f"data/{date}.json"
     path = _DATA_REPO_ROOT / rel
     data = storage.load_or_init(path, date)
     data = storage.append_snapshot(data, ts, kospi, kosdaq)
     storage.save(path, data)
-    print(f"wrote {path} ({len(data['snapshots'])} snapshots, updated_at={ts})")
+
+    # 2) 분 단위 파일 — 파일명에 시·분을 박아 고유 URL → CDN/브라우저 캐시 우회.
+    #    프론트가 누적 파일의 마지막 시점 이후 부족분을 이 파일들로 메워 1분 신선도 확보.
+    minute_rel = storage.minute_relpath(date, ts)
+    minute_path = _DATA_REPO_ROOT / minute_rel
+    storage.save_minute(minute_path, ts, kospi, kosdaq)
+
+    print(f"wrote {path} ({len(data['snapshots'])} snapshots) + {minute_rel}, updated_at={ts}")
 
     if skip_push:
         return
 
     git_sync.commit_and_push(
         repo_dir=_DATA_REPO_ROOT,
-        relpath=rel,
+        relpath=[rel, minute_rel],
         message=f"data: {date} {ts[11:19]} KST",
     )
 

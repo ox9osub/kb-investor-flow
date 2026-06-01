@@ -42,3 +42,23 @@ def save(path: Path, data: dict) -> None:
         json.dumps(data, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
+
+
+def minute_relpath(date: str, ts: str) -> str:
+    """분 단위 스냅샷의 data 브랜치 상대경로. 예: data/2026-06-01/10-47.json
+
+    파일명에 시·분을 박아 매 분 URL이 달라지므로 CDN/브라우저 캐시를 우회한다
+    (raw·jsdelivr 모두 쿼리스트링 ?t= 를 캐시 키에서 무시하므로 파일명으로 분리).
+    """
+    hh_mm = ts[11:16].replace(":", "-")  # "10:47" -> "10-47"
+    return f"data/{date}/{hh_mm}.json"
+
+
+def save_minute(path: Path, ts: str, kospi: dict, kosdaq: dict) -> None:
+    """해당 분의 단일 스냅샷만 기록 (누적 아님)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    snap = {"ts": ts, "kospi": kospi, "kosdaq": kosdaq}
+    path.write_text(
+        json.dumps(snap, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )

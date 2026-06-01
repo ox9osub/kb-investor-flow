@@ -6,8 +6,9 @@ import subprocess
 from pathlib import Path
 
 
-def commit_and_push(repo_dir: Path, relpath: str, message: str) -> None:
-    _run(["git", "add", relpath], cwd=repo_dir)
+def commit_and_push(repo_dir: Path, relpath: "str | list[str]", message: str) -> None:
+    paths = [relpath] if isinstance(relpath, str) else list(relpath)
+    _run(["git", "add", *paths], cwd=repo_dir)
 
     commit = subprocess.run(
         ["git", "commit", "-m", message],

@@ -54,3 +54,20 @@ def test_save_writes_utf8_with_unicode_keys(tmp_path):
     storage.save(path, data)
     raw = path.read_text(encoding="utf-8")
     assert "외국인" in raw
+
+
+def test_minute_relpath_uses_day_folder_and_hh_mm():
+    rel = storage.minute_relpath("2026-06-01", "2026-06-01T10:47:00+09:00")
+    assert rel == "data/2026-06-01/10-47.json"
+
+
+def test_save_minute_writes_single_snapshot(tmp_path):
+    kospi = {"외국인": {"매도": 1, "매수": 2, "순매수": 1}}
+    kosdaq = {"외국인": {"매도": 3, "매수": 4, "순매수": 1}}
+    path = tmp_path / "2026-06-01" / "10-47.json"
+    storage.save_minute(path, "2026-06-01T10:47:00+09:00", kospi, kosdaq)
+
+    snap = json.loads(path.read_text(encoding="utf-8"))
+    assert snap["ts"] == "2026-06-01T10:47:00+09:00"
+    assert snap["kospi"]["외국인"]["순매수"] == 1
+    assert snap["kosdaq"]["외국인"]["매수"] == 4

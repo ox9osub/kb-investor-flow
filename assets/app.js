@@ -64,13 +64,69 @@ async function refresh() {
   updateHeader(data.updated_at);
 }
 
+// raw·jsdelivr 모두 ?t= 쿼리스트링을 캐시 키에서 무시하므로, 누적 파일은 CDN 캐시로
+// 최대 5분 낡아 있다. 그래서 (1) 누적 파일로 과거 본체를 받고, (2) 그 마지막 시점 이후
+// 현재 분까지의 부족분을 파일명에 시·분을 박은 분 파일(고유 URL → 캐시 우회)로 메운다.
+// 메우는 개수는 캐시 TTL(약 5분)에 묶여 최대 ~6개 — 장 후반에도 늘지 않는다.
+const MINUTE_FILL_MAX = 8;
+
 async function fetchData() {
-  const url = USE_MOCK
-    ? "assets/mock-data.json"
-    : `${RAW_BASE}/data/${todayKstDateStr()}.json?t=${Date.now()}`;
-  const r = await fetch(url, { cache: "no-store" });
+  if (USE_MOCK) {
+    const r = await fetch("assets/mock-data.json", { cache: "no-store" });
+    return r.ok ? r.json() : null;
+  }
+
+  const date = todayKstDateStr();
+  const r = await fetch(`${RAW_BASE}/data/${date}.json?t=${Date.now()}`, { cache: "no-store" });
   if (!r.ok) return null;
-  return r.json();
+  const data = await r.json();
+
+  await fillRecentMinutes(data, date);
+  return data;
+}
+
+// 누적 파일의 마지막 스냅샷 이후 ~ 현재 분까지를, 분 파일로 채워 넣는다.
+async function fillRecentMinutes(data, date) {
+  const snaps = data.snapshots;
+  const lastTs = snaps.length ? snaps[snaps.length - 1].ts : null;
+  const lastMin = lastTs ? hhmmToMinutes(lastTs.slice(11, 16)) : -1;
+  const nowMin = hhmmToMinutes(nowKstHHMM());
+
+  const wanted = [];
+  for (let m = lastMin + 1; m <= nowMin && wanted.length < MINUTE_FILL_MAX; m++) {
+    wanted.push(minutesToHHMM(m));
+  }
+  if (!wanted.length) return;
+
+  const fetched = await Promise.all(wanted.map(hhmm =>
+    fetch(`${RAW_BASE}/data/${date}/${hhmm}.json?t=${Date.now()}`, { cache: "no-store" })
+      .then(res => res.ok ? res.json() : null)
+      .catch(() => null)
+  ));
+
+  for (const snap of fetched) {
+    if (snap && snap.ts) {
+      snaps.push(snap);
+      data.updated_at = snap.ts;
+    }
+  }
+}
+
+function hhmmToMinutes(hhmm) {
+  const [h, m] = hhmm.split(":");
+  return Number(h) * 60 + Number(m);
+}
+
+function minutesToHHMM(min) {
+  const h = String(Math.floor(min / 60)).padStart(2, "0");
+  const m = String(min % 60).padStart(2, "0");
+  return `${h}-${m}`;  // 파일명 형식: 10-47
+}
+
+function nowKstHHMM() {
+  return new Date().toLocaleTimeString("en-GB", {
+    timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false,
+  });  // "10:47"
 }
 
 function todayKstDateStr() {

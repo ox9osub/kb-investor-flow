@@ -20,9 +20,11 @@ GitHub Pages의 정적 사이트에서 ECharts로 시계열·스냅샷 차트로
 [Local PC] daemon.py (콘솔 상시 실행) → 매 분 정각 거래시간 체크
                                           ↓ (평일 08:50–15:40 KST 만)
                        KB 페이지 fetch → 파싱 → JSON append → git push (data 브랜치)
-                                                                    ↓ push 직후 purge.jsdelivr.net 호출
-[GitHub] data 브랜치 → cdn.jsdelivr.net/gh/<USER>/<REPO>@data (CORS + 5초 내 fresh)
-[GitHub] main 브랜치 → GitHub Pages → 정적 사이트 → fetch jsdelivr → ECharts 갱신
+[GitHub] data 브랜치 → raw.githubusercontent.com/<USER>/<REPO>/data (CORS OK, ?t= 캐시버스터로 즉시 fresh)
+[GitHub] main 브랜치 → GitHub Pages → 정적 사이트 → fetch raw + ?t= → ECharts 갱신
+
+  ※ jsdelivr는 쿼리스트링을 캐시 키에서 무시해 ?t= 캐시버스터가 안 먹히고, 엣지가
+    s-maxage(12h) 동안 옛 사본을 내려줘 1분 신선도가 깨졌음. raw로 전환해 해결.
 ```
 
 ## 초기 셋업 (새 PC / 처음 클론 시)

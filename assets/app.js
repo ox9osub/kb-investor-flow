@@ -1,6 +1,9 @@
 const REFRESH_MS = 60_000;
 const USE_MOCK = false;
-const RAW_BASE = "https://cdn.jsdelivr.net/gh/ox9osub/kb-investor-flow@data";
+// raw.githubusercontent 사용: jsdelivr는 쿼리스트링을 캐시 키에서 무시해 ?t= 캐시버스터가
+// 안 먹히고 엣지가 s-maxage(12h) 동안 같은 사본을 내려줘 1분 신선도가 깨졌음.
+// raw는 ?t= + cache:no-store 를 존중하므로 매 분 최신 스냅샷을 받는다.
+const RAW_BASE = "https://raw.githubusercontent.com/ox9osub/kb-investor-flow/data";
 
 const charts = { kospi: {}, kosdaq: {} };
 let currentMarket = "kospi";

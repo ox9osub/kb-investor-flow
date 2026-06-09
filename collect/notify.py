@@ -14,9 +14,9 @@ requests/bs4만 둠). 로직·파라미터는 trend.classify와 일치하며,
               (gitignore 처리됨. 봇은 해당 채널에 /invite 돼 있어야 함)
 
 트리거 주체 (NOTIFY_ACTORS 환경변수로 재정의, 쉼표구분):
-  기본 = 금융투자 only. 금융투자가 분단위로 가장 깔끔(하루 3~22회 변화)하고
-  사용자 1순위 관심사이기 때문. 매 알림에 11개 주체 전체 상태를 함께 싣는다.
-  외국인·개인 등 대형주체는 분단위로 하루 15~23회씩 출렁여 단독 트리거 시 과다.
+  기본 = 금융투자 + 외국인 (하루 ~36~69회). 금융투자=지수 견인 자기매매,
+  외국인=수급 큰손. 매 알림에 11개 주체 전체 상태를 진영별로 함께 싣는다.
+  금융투자는 항상 포함된다. 더 넓히면(기관·개인 등) 분단위로 더 자주 출렁여 과다.
 """
 from __future__ import annotations
 import json
@@ -28,7 +28,7 @@ _DATA_REPO_ROOT = _THIS_DIR.parent.parent / "kb-investor-flow-data"
 _STATE_FILE = _THIS_DIR / ".trend_state.json"
 _SLACK_CFG = _THIS_DIR / ".slack.json"
 DEFAULT_CHANNEL = "C0B99209CKB"
-DEFAULT_TRIGGERS = ["금융투자", "연기금등", "외국인"]
+DEFAULT_TRIGGERS = ["금융투자", "외국인"]
 
 PRIORITY = "금융투자"
 ALL_ACTORS = ["외국인", "개인", "기관", "기타법인",

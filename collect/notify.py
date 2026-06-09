@@ -188,7 +188,7 @@ def _format(changed: dict, board: dict, ts: str, market: str) -> str:
     # 핵심 컨텍스트: 변화에 없는 핵심 주체만 아이콘 붙여 한 줄
     ctx = [a for a in BOARD if a not in changed]
     if ctx:
-        lines.append("핵심 · " + " ".join(f"{a}{ICON[board[a][0]]}" for a in ctx))
+        lines.append("요약 : " + " ".join(f"{a}{ICON[board[a][0]]}" for a in ctx))
     when = ts[:16].replace("T", " ") if ts else ""
     lines.append(f"{when} · {market.upper()}")
     lines.append(f"<{DASHBOARD_URL}|대시보드 열기>")

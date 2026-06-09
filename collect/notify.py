@@ -178,13 +178,27 @@ def _save_state(date: str, labels: dict) -> None:
                                       ensure_ascii=False), encoding="utf-8")
 
 
+_BUY_FAM = {"지속매수", "매수전환", "매수둔화"}
+_SELL_FAM = {"지속매도", "매도전환", "매도둔화"}
+
+
+def _disp(old: str, new: str) -> str:
+    """방향이 새로 매수/매도로 돌아선 순간은 전환으로 표기(디바운스가 흡수한 전환 복원)."""
+    if new == "지속매수" and old not in _BUY_FAM:
+        return "매수전환"
+    if new == "지속매도" and old not in _SELL_FAM:
+        return "매도전환"
+    return new
+
+
 def _format(changed: dict, board: dict, ts: str, market: str) -> str:
-    """변화 주체는 줄별로 또렷이, 나머지 핵심 주체는 '핵심' 한 줄, 하단에 대시보드 링크."""
-    # 변화 주체: 각 줄 = [현재상태 아이콘] 주체  기존→변화  (속도)
-    lines = [
-        f"{ICON[changed[a][1]]} {a}  {changed[a][0]}→{changed[a][1]}  ({board[a][1]:+.0f}억)"
-        for a in sorted(changed, key=_rank)
-    ]
+    """변화 주체는 줄별로 또렷이, 나머지 핵심 주체는 '요약' 한 줄, 하단에 대시보드 링크."""
+    # 변화 주체: 각 줄 = [상태 아이콘] 주체  기존→변화  (속도)
+    lines = []
+    for a in sorted(changed, key=_rank):
+        old, new = changed[a]
+        new = _disp(old, new)
+        lines.append(f"{ICON[new]} {a}  {old}→{new}  ({board[a][1]:+.0f}억)")
     # 핵심 컨텍스트: 변화에 없는 핵심 주체만 아이콘 붙여 한 줄
     ctx = [a for a in BOARD if a not in changed]
     if ctx:

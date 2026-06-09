@@ -1,6 +1,6 @@
 """KB 투자자별 매매동향 상시 수집 데몬.
 
-콘솔 창 하나 열어 두면 24/7 동작. 매 분 정각에 거래시간 체크 후
+콘솔 창 하나 열어 두면 24/7 동작. 매 분 :01초에 거래시간 체크 후
 collect.collect_once()를 호출. 종료는 Ctrl+C.
 
 거래시간: 평일 08:50 – 15:40 KST (한국 정규장 + 동시호가 여유)
@@ -17,6 +17,8 @@ KST = ZoneInfo("Asia/Seoul")
 TRADING_START_MIN = 8 * 60 + 50   # 08:50
 TRADING_END_MIN   = 15 * 60 + 40  # 15:40
 
+TICK_SECOND = 1  # 매 분 :01초에 수집 (KB 페이지가 새 분 데이터로 갱신될 1초 여유)
+
 
 def _is_trading_window(now: datetime) -> bool:
     if now.weekday() > 4:
@@ -25,11 +27,13 @@ def _is_trading_window(now: datetime) -> bool:
     return TRADING_START_MIN <= cur <= TRADING_END_MIN
 
 
-def _sleep_to_next_minute() -> None:
+def _sleep_to_next_tick() -> None:
+    """다음 분 :TICK_SECOND 초까지 잔다. 매 호출마다 재계산 → 실행시간 드리프트 없음."""
     now = datetime.now(KST)
-    secs = 60 - now.second - now.microsecond / 1_000_000
-    if secs > 0:
-        time.sleep(secs)
+    secs = TICK_SECOND - now.second - now.microsecond / 1_000_000
+    if secs <= 0:          # 이미 이번 분의 틱을 지났으면 다음 분으로
+        secs += 60
+    time.sleep(secs)
 
 
 def main() -> None:
@@ -41,7 +45,7 @@ def main() -> None:
 
     while True:
         try:
-            _sleep_to_next_minute()
+            _sleep_to_next_tick()
             now = datetime.now(KST)
             ts = now.strftime("%H:%M:%S")
 

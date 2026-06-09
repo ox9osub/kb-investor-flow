@@ -57,7 +57,7 @@ cd C:\Users\suble\Desktop\work\project\kb-investor-flow
 ```
 
 **동작 방식 (`collect/daemon.py`):**
-- 매 분 정각(`:00`초)에 깨어남
+- 매 분 `:01`초에 깨어남 (KB 페이지가 새 분으로 갱신될 1초 여유; 매 루프 재정렬 → 드리프트 없음)
 - 평일 **08:50–15:40 KST** 구간이면 → `collect_once()` 호출 (fetch + parse + push + jsdelivr purge)
 - 그 외 시간(주말·공휴일·장 외 시간) → 조용히 sleep, 매시 정각만 `idle` 로그
 - 예외 발생해도 데몬 자체는 죽지 않음 — 다음 분에 자가 회복

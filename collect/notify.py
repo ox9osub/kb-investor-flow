@@ -36,9 +36,13 @@ ALL_ACTORS = ["외국인", "개인", "기관", "기타법인",
 # 출력 순위: 금융투자 > 연기금 > 외국인 > 나머지(기존 ALL_ACTORS 순).
 _RANK_HEAD = ["금융투자", "연기금등", "외국인"]
 
-# 8라벨 아이콘 (trend._ARROW와 동일): 지속=차트, 전환=원, 둔화=다이아, 혼조🟡 중립⚪
-ICON = {"지속매수": "📈", "매수전환": "🔴", "매수둔화": "🔸", "혼조": "🟡",
-        "중립": "⚪", "매도둔화": "🔹", "매도전환": "🔵", "지속매도": "📉"}
+# 8라벨 아이콘 (trend._ARROW와 동일): 지속=🔥💦, 전환=❤️💙, 둔화=🔸🔹, 혼조💤 중립◽
+ICON = {"지속매수": "🔥", "매수전환": "❤️", "매수둔화": "🔸", "혼조": "💤",
+        "중립": "◽", "매도둔화": "🔹", "매도전환": "💙", "지속매도": "💦"}
+
+# 알림에 표시할 핵심 주체(컨텍스트) — 소형주체 제외로 가독성 확보
+BOARD = ["외국인", "개인", "기관", "금융투자", "연기금등"]
+DASHBOARD_URL = "https://ox9osub.github.io/kb-investor-flow/"
 
 _TOP = {"외국인", "개인", "기관", "기타법인"}
 
@@ -174,31 +178,20 @@ def _save_state(date: str, labels: dict) -> None:
                                       ensure_ascii=False), encoding="utf-8")
 
 
-# '그 외' 주체를 진영별로 묶는 버킷 (가독성). 각 주체는 자기 아이콘으로 표기해 8라벨 유지.
-_BUCKETS = [
-    ("📈 매수", {"지속매수", "매수전환", "매수둔화"}),
-    ("📉 매도", {"지속매도", "매도전환", "매도둔화"}),
-    ("🟡 혼조", {"혼조"}),
-    ("⚪ 중립", {"중립"}),
-]
-
-
 def _format(changed: dict, board: dict, ts: str, market: str) -> str:
-    # 1줄: 변화 주체 (금융투자 > 연기금 > 외국인 > 나머지 순)
-    order = sorted(changed, key=_rank)
-    head = ", ".join(
-        f"{a} {ICON[changed[a][0]]}{changed[a][0]}→{ICON[changed[a][1]]}{changed[a][1]}"
-        f"({board[a][1]:+.0f}억/분)" for a in order
-    )
-    # 그 다음: 나머지 주체를 매수/매도/혼조/중립 진영으로 묶어 줄바꿈
-    others = [a for a in ALL_ACTORS if a not in changed]
-    lines = [head]
-    for title, labs in _BUCKETS:
-        members = sorted((a for a in others if board[a][0] in labs), key=_rank)
-        if members:
-            lines.append(f"{title} · " + " · ".join(f"{ICON[board[a][0]]}{a}" for a in members))
+    """변화 주체는 줄별로 또렷이, 나머지 핵심 주체는 '핵심' 한 줄, 하단에 대시보드 링크."""
+    # 변화 주체: 각 줄 = [현재상태 아이콘] 주체  기존→변화  (속도)
+    lines = [
+        f"{ICON[changed[a][1]]} {a}  {changed[a][0]}→{changed[a][1]}  ({board[a][1]:+.0f}억)"
+        for a in sorted(changed, key=_rank)
+    ]
+    # 핵심 컨텍스트: 변화에 없는 핵심 주체만 아이콘 붙여 한 줄
+    ctx = [a for a in BOARD if a not in changed]
+    if ctx:
+        lines.append("핵심 · " + " ".join(f"{a}{ICON[board[a][0]]}" for a in ctx))
     when = ts[:16].replace("T", " ") if ts else ""
     lines.append(f"{when} · {market.upper()}")
+    lines.append(f"<{DASHBOARD_URL}|대시보드 열기>")
     return "\n".join(lines)
 
 
@@ -208,7 +201,8 @@ def _post_slack(text: str, cfg: dict) -> None:
         r = requests.post(
             "https://slack.com/api/chat.postMessage",
             headers={"Authorization": f"Bearer {cfg['token']}"},
-            json={"channel": cfg["channel"], "text": text}, timeout=10,
+            json={"channel": cfg["channel"], "text": text,
+                  "unfurl_links": False, "unfurl_media": False}, timeout=10,
         )
         data = r.json()
         if not data.get("ok"):

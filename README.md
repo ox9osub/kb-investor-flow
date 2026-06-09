@@ -75,19 +75,42 @@ PC 재부팅 시에는 창을 다시 띄워야 합니다.
 - **트리거 기본값 = 금융투자** (분단위로 가장 깔끔, 하루 ~3–22회). 매 알림에 11개 주체
   전체 현재 상태를 함께 싣습니다. 외국인·개인 등 대형주체는 분단위로 하루 15–23회 출렁여
   단독 트리거 시 과다 → 넓히려면 `NOTIFY_ACTORS` 환경변수(쉼표구분)로 지정.
-- 메시지 형식: 1줄=변화주체(기존→변화, 속도, 금융투자 우선) / 2줄=그 외 주체 상태 / 3줄=시각·시장.
+- 메시지 형식: 1줄=변화주체(기존→변화·속도, 금융투자>연기금>외국인 순) / 다음 줄들=그 외
+  주체를 **매수·매도·혼조·중립 진영별로 묶어** 표기 / 마지막 줄=시각·시장.
+  아이콘: 📈지속매수 📉지속매도 🔴매수전환 🔵매도전환 🔸매수둔화 🔹매도둔화 🟡혼조 ⚪중립.
 - 분류 로직은 `collect/trend.py`(pandas 분석용)와 동일하며 `notify.py`는 수집기 venv에서
   돌도록 순수 파이썬으로 재구현. 일치 검증: `python collect/notify.py <date> --selftest`.
 
-**슬랙 설정** — `collect/.slack.json`(gitignore됨)에 봇토큰+채널을 둡니다:
+**슬랙 설정** — 두 방법 중 하나. **환경변수가 `.slack.json`보다 우선**합니다.
+미설정 시 알림은 stdout으로만 출력(드라이런). 봇은 대상 채널에 `/invite` 돼 있어야 합니다.
+
+방법 ① 로컬 설정파일 `collect/.slack.json` (gitignore됨, 다른 PC엔 수동 복사 필요):
 
 ```json
 { "token": "xoxb-…", "channel": "C0B99209CKB" }
 ```
 
-봇은 해당 채널에 `/invite` 돼 있어야 합니다. 환경변수
-(`SLACK_BOT_TOKEN`+`SLACK_CHANNEL`, 또는 `SLACK_WEBHOOK_URL`)로도 설정 가능.
-미설정 시 알림은 stdout으로만 출력(드라이런).
+방법 ② 환경변수 (PowerShell):
+
+```powershell
+# 봇토큰 방식 — 이번 콘솔 세션에만 적용 (창 닫으면 사라짐)
+$env:SLACK_BOT_TOKEN = "xoxb-…"
+$env:SLACK_CHANNEL   = "C0B99209CKB"
+
+# 영구 저장 — 사용자 환경변수에 기록, 새로 여는 콘솔부터 적용
+setx SLACK_BOT_TOKEN "xoxb-…"
+setx SLACK_CHANNEL   "C0B99209CKB"
+
+# 웹훅 방식 (봇토큰 대신)
+$env:SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/…"
+
+# 트리거 주체 확장 (기본=금융투자, 쉼표구분 / 금융투자는 항상 포함)
+$env:NOTIFY_ACTORS = "금융투자,연기금등,외국인,기관,개인"
+```
+
+> 데몬을 띄운 콘솔에서 환경변수를 쓰려면, **그 콘솔에서** `$env:…` 설정 후
+> `daemon.py`를 실행하거나(세션 한정), `setx`로 영구 저장 뒤 콘솔을 새로 열어야 합니다.
+> `SLACK_CHANNEL` 미지정 시 기본 채널 `C0B99209CKB`이 사용됩니다.
 
 ```powershell
 # 특정일 현재 상태 보드 / 전환 이벤트 로그 (분석용, trend.py)

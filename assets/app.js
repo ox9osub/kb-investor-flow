@@ -79,6 +79,8 @@ async function refresh() {
   if (!data) { showNoData(date, isToday); return; }
   updateAllCharts(data);
   updateHeader(data.updated_at);
+  const note = document.getElementById("refreshNote");
+  note.textContent = isToday ? "자동 새로고침 60s" : `선택일: ${date} (과거)`;
 }
 
 // raw·jsdelivr 모두 ?t= 쿼리스트링을 캐시 키에서 무시하므로, 누적 파일은 CDN 캐시로

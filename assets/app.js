@@ -7,14 +7,28 @@ const RAW_BASE = "https://raw.githubusercontent.com/ox9osub/kb-investor-flow/dat
 
 const charts = { kospi: {}, kosdaq: {} };
 let currentMarket = "kospi";
+let selectedDate = todayKstDateStr();  // 지금 보고 있는 날짜 (기본: 오늘 KST)
 
 document.addEventListener("DOMContentLoaded", () => {
   initCharts();
   initTabs();
+  initDatePicker();
   refresh();
   setInterval(refresh, REFRESH_MS);
   window.addEventListener("resize", resizeAll);
 });
+
+function initDatePicker() {
+  const el = document.getElementById("datePicker");
+  const today = todayKstDateStr();
+  el.max = today;          // 미래 날짜 선택 불가
+  el.value = today;        // 페이지를 새로 열면 항상 오늘
+  selectedDate = today;
+  el.addEventListener("change", () => {
+    selectedDate = el.value || today;
+    refresh();             // 날짜 변경 시 즉시 1회 로드
+  });
+}
 
 function initCharts() {
   document.querySelectorAll(".market-panel").forEach(panel => {
@@ -52,14 +66,17 @@ function resizeAll() {
 }
 
 async function refresh() {
+  const date = selectedDate;
+  const isToday = date === todayKstDateStr();
   let data;
   try {
-    data = await fetchData();
+    data = await fetchData(date, isToday);
   } catch (e) {
     console.warn("fetch failed:", e);
     return;
   }
-  if (!data) return;
+  // 과거 날짜에 데이터가 없으면(404 등) 안내 후 종료 (Task 3에서 처리 강화)
+  if (!data) { showNoData(date, isToday); return; }
   updateAllCharts(data);
   updateHeader(data.updated_at);
 }
@@ -70,20 +87,26 @@ async function refresh() {
 // 메우는 개수는 캐시 TTL(약 5분)에 묶여 최대 ~6개 — 장 후반에도 늘지 않는다.
 const MINUTE_FILL_MAX = 8;
 
-async function fetchData() {
+async function fetchData(date, isToday) {
   if (USE_MOCK) {
     const r = await fetch("assets/mock-data.json", { cache: "no-store" });
     return r.ok ? r.json() : null;
   }
 
-  const date = todayKstDateStr();
   const r = await fetch(`${RAW_BASE}/data/${date}.json?t=${Date.now()}`, { cache: "no-store" });
   if (!r.ok) return null;
   const data = await r.json();
 
-  await fillRecentMinutes(data, date);
+  // 오늘만 라이브 보정: 분 파일로 최신분 채우기 (INVARIANT — 오늘 경로 그대로).
+  // 과거 날짜는 완성된 정적 파일이라 채우기 불필요.
+  if (isToday) {
+    await fillRecentMinutes(data, date);
+  }
   return data;
 }
+
+// Task 3에서 본문 구현. 우선 빈 정의로 두어 refresh가 동작하게 한다.
+function showNoData(date, isToday) {}
 
 // 누적 파일의 마지막 스냅샷 이후 ~ 현재 분까지를, 분 파일로 채워 넣는다.
 async function fillRecentMinutes(data, date) {

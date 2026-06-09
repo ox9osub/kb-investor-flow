@@ -66,6 +66,39 @@ cd C:\Users\suble\Desktop\work\project\kb-investor-flow
 콘솔 창은 그냥 띄워 두기만 하면 됨. 다른 작업 해도 백그라운드에서 매 분 갱신.
 PC 재부팅 시에는 창을 다시 띄워야 합니다.
 
+## 슬랙 알림 — 투자주체 추세 상태 변화 (`collect/notify.py`)
+
+각 투자주체의 누적순매수 기울기를 매분 8개 라벨(`지속매수/지속매도/매수전환/매도전환/
+매수둔화/매도둔화/혼조/중립`)로 분류하고, **트리거 주체의 라벨이 바뀌면** 슬랙으로 보냅니다.
+`collect_once()`가 수집 직후 자동 호출하므로 데몬을 띄워 두면 알림도 같이 동작합니다.
+
+- **트리거 기본값 = 금융투자** (분단위로 가장 깔끔, 하루 ~3–22회). 매 알림에 11개 주체
+  전체 현재 상태를 함께 싣습니다. 외국인·개인 등 대형주체는 분단위로 하루 15–23회 출렁여
+  단독 트리거 시 과다 → 넓히려면 `NOTIFY_ACTORS` 환경변수(쉼표구분)로 지정.
+- 메시지 형식: 1줄=변화주체(기존→변화, 속도, 금융투자 우선) / 2줄=그 외 주체 상태 / 3줄=시각·시장.
+- 분류 로직은 `collect/trend.py`(pandas 분석용)와 동일하며 `notify.py`는 수집기 venv에서
+  돌도록 순수 파이썬으로 재구현. 일치 검증: `python collect/notify.py <date> --selftest`.
+
+**슬랙 설정** — `collect/.slack.json`(gitignore됨)에 봇토큰+채널을 둡니다:
+
+```json
+{ "token": "xoxb-…", "channel": "C0B99209CKB" }
+```
+
+봇은 해당 채널에 `/invite` 돼 있어야 합니다. 환경변수
+(`SLACK_BOT_TOKEN`+`SLACK_CHANNEL`, 또는 `SLACK_WEBHOOK_URL`)로도 설정 가능.
+미설정 시 알림은 stdout으로만 출력(드라이런).
+
+```powershell
+# 특정일 현재 상태 보드 / 전환 이벤트 로그 (분석용, trend.py)
+.\.venv-pandas\Scripts\python.exe collect\trend.py 2026-06-01
+.\.venv-pandas\Scripts\python.exe collect\trend.py 2026-06-01 --transitions
+# 알림 1회 수동 점검 (슬랙 미설정 시 stdout)
+.\.venv\Scripts\python.exe collect\notify.py 2026-06-01 --test
+```
+
+> `trend.py`는 pandas/pyarrow가 필요합니다(분석용 별도 venv). `notify.py`는 수집기 venv로 동작.
+
 ## 디버깅용 1회 실행
 
 `daemon.py`를 안 띄우고 한 사이클만 수동 실행하고 싶을 때:

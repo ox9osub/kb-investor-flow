@@ -50,6 +50,13 @@ def collect_once(dry_run: bool = False, skip_push: bool = False) -> None:
 
     print(f"wrote {path} ({len(data['snapshots'])} snapshots) + {minute_rel}, updated_at={ts}")
 
+    # 3) 투자주체 추세 상태 변화 → 슬랙 알림 (실패해도 수집은 계속)
+    try:
+        import notify
+        notify.check_and_notify(date)
+    except Exception as e:
+        print(f"[notify] skipped: {e}", flush=True)
+
     if skip_push:
         return
 

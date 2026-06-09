@@ -105,8 +105,16 @@ async function fetchData(date, isToday) {
   return data;
 }
 
-// Task 3에서 본문 구현. 우선 빈 정의로 두어 refresh가 동작하게 한다.
-function showNoData(date, isToday) {}
+function showNoData(date, isToday) {
+  // 차트를 비운다 (이전 날짜 잔상 제거).
+  for (const market of Object.keys(charts)) {
+    for (const c of Object.values(charts[market])) c.clear();
+  }
+  const updated = document.getElementById("updated");
+  updated.textContent = "-";
+  const note = document.getElementById("refreshNote");
+  note.textContent = isToday ? "장 시작 전 — 데이터 없음" : `${date} — 해당 일자 데이터 없음`;
+}
 
 // 누적 파일의 마지막 스냅샷 이후 ~ 현재 분까지를, 분 파일로 채워 넣는다.
 async function fillRecentMinutes(data, date) {

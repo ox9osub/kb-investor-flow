@@ -1,4 +1,6 @@
 """일별 JSON 파일 I/O + KST 시간 유틸."""
+from __future__ import annotations  # 배포 머신 Python<3.10에서 `X | None` 시그니처 평가 회피
+
 import json
 from datetime import datetime
 from pathlib import Path

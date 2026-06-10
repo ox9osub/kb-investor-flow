@@ -25,12 +25,19 @@ def collect_once(dry_run: bool = False, skip_push: bool = False) -> None:
     kospi  = parse.parse_market_html(kospi_html)
     kosdaq = parse.parse_market_html(kosdaq_html)
 
+    # 지수 값은 부가정보 — 실패해도 매매동향 수집은 계속 (index=None).
+    try:
+        index = parse.parse_index_json(fetch.fetch_index_json())
+    except Exception as e:
+        print(f"[index] skipped: {e}", flush=True)
+        index = None
+
     date = storage.today_str()
     ts   = storage.now_iso()
 
     if dry_run:
         print(json.dumps(
-            {"ts": ts, "kospi": kospi, "kosdaq": kosdaq},
+            {"ts": ts, "kospi": kospi, "kosdaq": kosdaq, "index": index},
             ensure_ascii=False, indent=2,
         ))
         return
@@ -39,14 +46,14 @@ def collect_once(dry_run: bool = False, skip_push: bool = False) -> None:
     rel = f"data/{date}.json"
     path = _DATA_REPO_ROOT / rel
     data = storage.load_or_init(path, date)
-    data = storage.append_snapshot(data, ts, kospi, kosdaq)
+    data = storage.append_snapshot(data, ts, kospi, kosdaq, index)
     storage.save(path, data)
 
     # 2) 분 단위 파일 — 파일명에 시·분을 박아 고유 URL → CDN/브라우저 캐시 우회.
     #    프론트가 누적 파일의 마지막 시점 이후 부족분을 이 파일들로 메워 1분 신선도 확보.
     minute_rel = storage.minute_relpath(date, ts)
     minute_path = _DATA_REPO_ROOT / minute_rel
-    storage.save_minute(minute_path, ts, kospi, kosdaq)
+    storage.save_minute(minute_path, ts, kospi, kosdaq, index)
 
     print(f"wrote {path} ({len(data['snapshots'])} snapshots) + {minute_rel}, updated_at={ts}")
 

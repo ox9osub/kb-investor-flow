@@ -195,6 +195,37 @@ function topLevelNet(snap, market, category) {
   return v ? v.순매수 : null;
 }
 
+const INDEX_LABEL = { kospi: "코스피지수", kosdaq: "코스닥지수" };
+
+function indexValue(snap, market) {
+  return snap.index?.[market]?.지수 ?? null;
+}
+
+// 매매동향 라인 차트에 우측 보조축으로 얹는 지수 시리즈 (검은 실선).
+// 순매수(억원, 좌축)와 스케일이 전혀 달라 yAxisIndex:1 + scale:true로 분리.
+function indexSeries(market, data) {
+  return {
+    name: INDEX_LABEL[market],
+    type: "line",
+    yAxisIndex: 1,
+    smooth: true,
+    showSymbol: false,
+    z: 10,
+    lineStyle: { color: "#000", width: 2 },
+    itemStyle: { color: "#000" },
+    data: data.snapshots.map(s => [s.ts, indexValue(s, market)]),
+  };
+}
+
+// 좌(억원) + 우(지수) 2축. 우축은 0 기준이 아닌 실제 지수 범위로 자동 스케일.
+function dualYAxis() {
+  return [
+    { type: "value", name: "억원" },
+    { type: "value", name: "지수", position: "right", scale: true,
+      splitLine: { show: false } },
+  ];
+}
+
 function setMainLines(market, data) {
   const chart = charts[market].mainLines;
   if (!chart) return;
@@ -206,12 +237,13 @@ function setMainLines(market, data) {
     itemStyle: { color: COLOR[cat] },
     data: data.snapshots.map(s => [s.ts, topLevelNet(s, market, cat)]),
   }));
+  series.push(indexSeries(market, data));
   chart.setOption({
     tooltip: { trigger: "axis" },
-    legend: { top: 0, data: MAIN_CATEGORIES },
-    grid: { top: 40, left: 60, right: 24, bottom: 60 },
+    legend: { top: 0, data: [...MAIN_CATEGORIES, INDEX_LABEL[market]] },
+    grid: { top: 40, left: 60, right: 60, bottom: 60 },
     xAxis: { type: "time" },
-    yAxis: { type: "value", name: "억원" },
+    yAxis: dualYAxis(),
     dataZoom: [{ type: "slider", bottom: 10, height: 20 }],
     series,
   });
@@ -237,12 +269,13 @@ function setInstitutionLines(market, data) {
     showSymbol: false,
     data: data.snapshots.map(s => [s.ts, institutionSubNet(s, market, sub)]),
   }));
+  series.push(indexSeries(market, data));
   chart.setOption({
     tooltip: { trigger: "axis" },
-    legend: { top: 0, data: INSTITUTION_SUBS, type: "scroll" },
-    grid: { top: 50, left: 60, right: 24, bottom: 60 },
+    legend: { top: 0, data: [...INSTITUTION_SUBS, INDEX_LABEL[market]], type: "scroll" },
+    grid: { top: 50, left: 60, right: 60, bottom: 60 },
     xAxis: { type: "time" },
-    yAxis: { type: "value", name: "억원" },
+    yAxis: dualYAxis(),
     dataZoom: [{ type: "slider", bottom: 10, height: 20 }],
     series,
   });

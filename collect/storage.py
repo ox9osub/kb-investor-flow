@@ -30,8 +30,12 @@ def load_or_init(path: Path, date: str) -> dict:
     }
 
 
-def append_snapshot(data: dict, ts: str, kospi: dict, kosdaq: dict) -> dict:
-    data["snapshots"].append({"ts": ts, "kospi": kospi, "kosdaq": kosdaq})
+def append_snapshot(data: dict, ts: str, kospi: dict, kosdaq: dict,
+                    index: dict | None = None) -> dict:
+    snap = {"ts": ts, "kospi": kospi, "kosdaq": kosdaq}
+    if index is not None:
+        snap["index"] = index
+    data["snapshots"].append(snap)
     data["updated_at"] = ts
     return data
 
@@ -54,10 +58,13 @@ def minute_relpath(date: str, ts: str) -> str:
     return f"data/{date}/{hh_mm}.json"
 
 
-def save_minute(path: Path, ts: str, kospi: dict, kosdaq: dict) -> None:
+def save_minute(path: Path, ts: str, kospi: dict, kosdaq: dict,
+                index: dict | None = None) -> None:
     """해당 분의 단일 스냅샷만 기록 (누적 아님)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     snap = {"ts": ts, "kospi": kospi, "kosdaq": kosdaq}
+    if index is not None:
+        snap["index"] = index
     path.write_text(
         json.dumps(snap, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",

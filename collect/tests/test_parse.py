@@ -11,6 +11,12 @@ def _read(name: str) -> str:
     return (FIXTURES / name).read_text(encoding="utf-8")
 
 
+def test_parse_index_json_extracts_both_markets():
+    result = parse.parse_index_json(_read("index_sample.json"))
+    assert result["kospi"] == {"지수": 7875.44, "전일대비": -221.49, "등락률": -2.74}
+    assert result["kosdaq"] == {"지수": 975.24, "전일대비": 7.43, "등락률": 0.77}
+
+
 def test_kospi_has_four_top_level_categories():
     html = _read("kospi_sample.html")
     result = parse.parse_market_html(html)

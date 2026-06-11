@@ -28,7 +28,7 @@ _DATA_REPO_ROOT = _THIS_DIR.parent.parent / "kb-investor-flow-data"
 _STATE_FILE = _THIS_DIR / ".trend_state.json"
 _SLACK_CFG = _THIS_DIR / ".slack.json"
 DEFAULT_CHANNEL = "C0B99209CKB"
-DEFAULT_TRIGGERS = ["금융투자", "외국인"]
+DEFAULT_TRIGGERS = ["금융투자", "외국인", "연기금등"]
 
 PRIORITY = "금융투자"
 ALL_ACTORS = ["외국인", "개인", "기관", "기타법인",
@@ -215,6 +215,59 @@ def _format(changed: dict, board: dict, ts: str, market: str) -> str:
     return "\n".join(lines)
 
 
+def _index_series(snaps, market):
+    out = []
+    for s in snaps:
+        if not ("09:00" <= s["ts"][11:16] <= "15:30"):
+            continue
+        idx = s.get("index")
+        if idx and market in idx and idx[market].get("지수") is not None:
+            out.append(idx[market]["지수"])
+    return out
+
+
+def _index_rate(snaps, market):
+    for s in reversed(snaps):
+        idx = s.get("index")
+        if idx and market in idx:
+            return idx[market].get("지수"), idx[market].get("등락률")
+    return None, None
+
+
+def _index_header(snaps):
+    parts = []
+    for m in ("kospi", "kosdaq"):
+        v, rate = _index_rate(snaps, m)
+        if v is None:
+            continue
+        r = f"{rate:+.2f}%" if rate is not None else "?"
+        parts.append(f"{m.upper()} {v:,.1f} ({r})")
+    return " · ".join(parts)
+
+
+def _minutes_between(a, b):
+    from datetime import datetime
+    return abs((datetime.fromisoformat(b) - datetime.fromisoformat(a)).total_seconds()) / 60
+
+
+def _save_state_full(state):
+    _STATE_FILE.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+
+
+def _format_v2(header, fired, details, ts, enabled, fired_kinds, heartbeat):
+    import events
+    lines = [header] if header else []
+    for e in sorted(fired, key=lambda x: x["rank"]):
+        lines.append(f"{e['icon']} {e['text']}")
+    core = [a for a in BOARD if a in details]
+    hb = "💤 " if heartbeat else ""
+    lines.append(hb + "요약 : " + " ".join(f"{a}{ICON[details[a]['official']]}" for a in core))
+    lines.append(f"{ts[:16].replace('T', ' ')} · 통합")
+    lines.append(f"<{DASHBOARD_URL}|대시보드 열기>")
+    lines.append(events.render_roster(enabled, fired_kinds))
+    return "\n".join(lines)
+
+
 def _post_slack(text: str, cfg: dict) -> None:
     import requests
     if cfg.get("token"):
@@ -233,32 +286,118 @@ def _post_slack(text: str, cfg: dict) -> None:
         raise RuntimeError("no slack config (SLACK_BOT_TOKEN+SLACK_CHANNEL / webhook / .slack.json)")
 
 
-def check_and_notify(date: str | None = None, market: str = "kospi",
-                     data_root: Path = _DATA_REPO_ROOT, test: bool = False):
-    """수집 직후 1회 호출용. 트리거 주체 라벨 변화 시 슬랙 발송(또는 test 시 stdout)."""
+def check_and_notify(date=None, market="kospi", data_root=_DATA_REPO_ROOT, test=False):
+    """수집 직후 1회 호출. 다중 감지기 → 분당 1통합 메시지 발송(또는 test 시 stdout)."""
+    import events
     if date is None:
         import storage
         date = storage.today_str()
-    board, ts = current_board(date, market, data_root)
-    monitored = _monitor_actors()
-    cur = {a: board[a][0] for a in monitored}
 
-    state = _load_state()
-    prev = state.get("labels") if state.get("date") == date else None
-    _save_state(date, cur)
-
-    if prev is None:                       # 그날 첫 관측 → 기준선만 잡고 침묵
+    data = json.loads((Path(data_root) / "data" / f"{date}.json").read_text(encoding="utf-8"))
+    snaps = data["snapshots"]
+    if not snaps:
         return None
-    changed = {a: (prev[a], cur[a]) for a in monitored
-               if a in prev and prev[a] != cur[a]}
-    if not changed:
+    ts = snaps[-1]["ts"]
+    if not ("09:00" <= ts[11:16] <= "15:30"):
         return None
 
-    msg = _format(changed, board, ts, market)
-    cfg = _slack_config()
-    if not test and (cfg.get("token") or cfg.get("webhook")):
+    cfg = events.CFG
+    managed = _monitor_actors()
+    details, cums = {}, {}
+    for a in ALL_ACTORS:
+        cum = _series(snaps, a, market)
+        cums[a] = cum
+        details[a] = classify_full(cum) if len(cum) >= 2 else {"official": "중립", "pace": 0.0, "e_dir": 0}
+
+    st = _load_state()
+    fresh_day = st.get("date") != date
+    prev_labels = {} if fresh_day else st.get("labels", {})
+    prev_fast = {} if fresh_day else st.get("fast_dir", {})
+    fired_map = {} if fresh_day else st.get("fired", {})
+    day_high = {} if fresh_day else st.get("day_high", {})
+    day_low = {} if fresh_day else st.get("day_low", {})
+    streak = {} if fresh_day else st.get("streak", {})
+    session_done = {} if fresh_day else st.get("session_done", {})
+    last_alert = None if fresh_day else st.get("last_alert_ts")
+
+    for a in ALL_ACTORS:
+        streak[a] = streak.get(a, 0) + 1 if details[a]["official"] == "지속매수" else 0
+
+    enabled = events.enabled_events()
+    cur_series = _index_series(snaps, market)
+    header = _index_header(snaps)
+    raw = []
+
+    if not fresh_day:
+        for a in managed:
+            if "확정전환" in enabled:
+                raw += events.detect_confirmed_transition(a, details[a], prev_labels.get(a), cums[a], cfg)
+            if "잠정전환" in enabled:
+                raw += events.detect_provisional_transition(a, details[a], prev_fast.get(a, 0), cums[a], cfg)
+            if "flow급증" in enabled:
+                raw += events.detect_flow_spike(a, cums[a], cfg)
+            if "마일스톤" in enabled:
+                raw += events.detect_milestone(a, streak.get(a, 0), cfg)
+        if "정렬" in enabled:
+            raw += events.detect_alignment({a: details[a] for a in managed}, cfg)
+        if "개인디버전스" in enabled:
+            raw += events.detect_individual_divergence(details, managed, cfg)
+        if "지수윈도우" in enabled:
+            raw += events.detect_index_window(market, cur_series, cfg)
+        if "지수스파이크" in enabled:
+            raw += events.detect_index_spike(market, cur_series, cfg)
+        if "신고저" in enabled and cur_series:
+            raw += events.detect_new_high_low(market, cur_series[-1], day_high.get(market), day_low.get(market), cfg)
+        if "지수디버전스" in enabled:
+            raw += events.detect_index_divergence(_index_series(snaps, "kospi"), _index_series(snaps, "kosdaq"), cfg)
+        if "개장마감" in enabled:
+            raw += events.detect_session(ts[11:16], session_done, header, cfg)
+
+    # 쿨다운/dedup 필터
+    fired = []
+    for e in raw:
+        last = fired_map.get(e["dedup"])
+        cd = events.COOLDOWN.get(e["kind"], 0)
+        if last is not None and _minutes_between(last, ts) < cd:
+            continue
+        fired.append(e)
+        fired_map[e["dedup"]] = ts
+    for e in fired:
+        if e["dedup"] == "open":
+            session_done["open"] = True
+        if e["dedup"] == "close":
+            session_done["close"] = True
+    if cur_series:
+        c = cur_series[-1]
+        day_high[market] = max(day_high.get(market, c), c)
+        day_low[market] = min(day_low.get(market, c), c)
+
+    heartbeat = (not fired and not fresh_day and "하트비트" in enabled and
+                 (last_alert is None or _minutes_between(last_alert, ts) >= cfg["heartbeat_min"]))
+
+    new_state = {
+        "date": date,
+        "labels": {a: details[a]["official"] for a in managed},
+        "fast_dir": {a: details[a]["e_dir"] for a in managed},
+        "fired": fired_map, "day_high": day_high, "day_low": day_low,
+        "streak": streak, "session_done": session_done, "last_alert_ts": last_alert,
+    }
+    if fresh_day or (not fired and not heartbeat):
+        _save_state_full(new_state)
+        return None
+
+    new_state["last_alert_ts"] = ts
+    _save_state_full(new_state)
+
+    fired_kinds = {e["kind"] for e in fired}
+    if heartbeat:
+        fired_kinds.add("하트비트")
+    msg = _format_v2(header, fired, details, ts, enabled, fired_kinds, heartbeat)
+
+    cfg_slack = _slack_config()
+    if not test and (cfg_slack.get("token") or cfg_slack.get("webhook")):
         try:
-            _post_slack(msg, cfg)
+            _post_slack(msg, cfg_slack)
         except Exception as e:
             print(f"[notify] slack post failed: {e}", flush=True)
     else:

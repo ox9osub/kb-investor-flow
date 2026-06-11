@@ -94,12 +94,12 @@ def _ema(x: float, prev: float | None, span: int) -> float:
     return x if prev is None else a * x + (1 - a) * prev
 
 
-def classify_last(cum, pace_span=9, base_span=30, dead_frac=0.4, floor=1.0,
+def classify_full(cum, pace_span=9, base_span=30, dead_frac=0.4, floor=1.0,
                   confirm=3, stop_n=3, chop_win=7, chop_n=4, hold=3):
-    """누적순매수 시퀀스 → (마지막 분 공식라벨, 현재속도). trend.classify와 동일 로직.
+    """누적순매수 시퀀스 → 마지막 분 {official, pace, e_dir}. trend.classify와 동일 로직.
 
-    확정방향 E를 sticky 유지 + 출력라벨을 hold분 디바운스 — 1~2분 깜빡임을 흡수해
-    공식 라벨은 천천히만 바뀐다(알림 폭주 방지).
+    official = 출력 디바운스된 공식라벨, e_dir = sticky 확정방향 E(-1/0/+1).
+    e_dir이 official 계열보다 먼저 뒤집히는 구간이 '잠정 전환'(events.py)이다.
     """
     pace = typ = None
     E = run_dir = run_len = 0
@@ -150,7 +150,13 @@ def classify_last(cum, pace_span=9, base_span=30, dead_frac=0.4, floor=1.0,
         else:
             cand, cand_len = reg, 1
         last_pace = pace
-    return cur_off, round(last_pace, 1)
+    return {"official": cur_off, "pace": round(last_pace, 1), "e_dir": E}
+
+
+def classify_last(cum, **kw):
+    """하위호환 래퍼 — (공식라벨, 속도). 신규 코드는 classify_full 사용."""
+    f = classify_full(cum, **kw)
+    return f["official"], f["pace"]
 
 
 def current_board(date: str, market: str = "kospi", data_root: Path = _DATA_REPO_ROOT):

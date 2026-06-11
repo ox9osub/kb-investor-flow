@@ -30,7 +30,7 @@ CFG = {
     "heartbeat_min": 5,
     "win_n": 5, "win_pct": 0.30,
     "spike_pct": 0.20,
-    "ratchet_D": 30.0, "ratchet_W": 20.0,
+    "ratchet_D": 30.0, "ratchet_W": 20,
     "hilo_eps": 0.5,
     "flow_z": 2.5, "flow_win": 20,
     "align_eps": 1.0, "indiv_eps": 1.0,

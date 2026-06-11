@@ -165,3 +165,52 @@ def detect_index_divergence(kospi_series, kosdaq_series, cfg):
         return [ev("지수디버전스", "↔️", f"코스피 {pk:+.2f}% ↔ 코스닥 {pq:+.2f}%",
                    dedup="idxdiv")]
     return []
+
+
+def detect_alignment(details, cfg):
+    dirs = {d["e_dir"] for d in details.values()}
+    if dirs == {1} or dirs == {-1}:
+        side = "매수" if 1 in dirs else "매도"
+        names = " ".join(details.keys())
+        return [ev("정렬", "🧭", f"관리주체 동반{side} 정렬 ({names})", dedup="정렬")]
+    return []
+
+
+def detect_individual_divergence(details, managed, cfg):
+    mdirs = [details[a]["e_dir"] for a in managed if a in details]
+    ind = details.get("개인", {}).get("e_dir", 0)
+    if mdirs and all(x == 1 for x in mdirs) and ind == -1:
+        return [ev("개인디버전스", "🪞", "관리주체 매수 ↔ 개인 매도 (역추세 확인)", dedup="indiv")]
+    if mdirs and all(x == -1 for x in mdirs) and ind == 1:
+        return [ev("개인디버전스", "🪞", "관리주체 매도 ↔ 개인 매수", dedup="indiv")]
+    return []
+
+
+def detect_flow_spike(actor, cum, cfg):
+    w = cfg["flow_win"]
+    if len(cum) < w + 2:
+        return []
+    flows = [cum[i] - cum[i - 1] for i in range(1, len(cum))]
+    last = flows[-1]
+    base = flows[-w - 1:-1]
+    mean = sum(base) / len(base)
+    variance = sum((x - mean) ** 2 for x in base) / len(base)
+    sd = variance ** 0.5
+    if sd == 0:
+        # 베이스 구간 분산이 0일 때: last가 mean과 같으면 침묵, 다르면 무한 z → 급증 판정
+        if last == mean:
+            return []
+        z = float("inf") if last > mean else float("-inf")
+    else:
+        z = (last - mean) / sd
+    if abs(z) < cfg["flow_z"]:
+        return []
+    return [ev("flow급증", "💥", f"{actor} 분당 {last:+.0f}억 급증 (z{z:+.1f})",
+               dedup=f"flow:{actor}")]
+
+
+def detect_milestone(actor, streak, cfg):
+    if streak in cfg["milestone_marks"]:
+        return [ev("마일스톤", "🎯", f"{actor} 지속매수 {streak}분 연속",
+                   dedup=f"mile:{actor}:{streak}")]
+    return []

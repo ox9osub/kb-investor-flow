@@ -159,3 +159,43 @@ def test_index_divergence_silent_when_same_direction():
     kospi = [100.0] * 6 + [100.3]   # +0.30%
     kosdaq = [100.0] * 6 + [100.2]  # +0.20% (같은 방향) → 침묵
     assert events.detect_index_divergence(kospi, kosdaq, events.CFG) == []
+
+
+def test_alignment_fires_when_all_managed_buy():
+    details = {"금융투자": {"e_dir": 1}, "외국인": {"e_dir": 1}, "연기금등": {"e_dir": 1}}
+    out = events.detect_alignment(details, events.CFG)
+    assert len(out) == 1 and "동반매수" in out[0]["text"]
+
+
+def test_alignment_silent_when_mixed():
+    details = {"금융투자": {"e_dir": 1}, "외국인": {"e_dir": -1}, "연기금등": {"e_dir": 0}}
+    assert events.detect_alignment(details, events.CFG) == []
+
+
+def test_individual_divergence_managed_buy_individual_sell():
+    details = {"금융투자": {"e_dir": 1}, "외국인": {"e_dir": 1},
+               "연기금등": {"e_dir": 1}, "개인": {"e_dir": -1}}
+    out = events.detect_individual_divergence(details, ["금융투자", "외국인", "연기금등"], events.CFG)
+    assert len(out) == 1 and out[0]["kind"] == "개인디버전스"
+
+
+def test_flow_spike_fires_on_zscore_outlier():
+    cum = [0]
+    for i in range(1, 25):
+        cum.append(cum[-1] + 5)       # 분당 +5 평탄
+    cum.append(cum[-1] + 80)          # 급증
+    out = events.detect_flow_spike("금융투자", cum, events.CFG)
+    assert len(out) == 1 and out[0]["kind"] == "flow급증"
+
+
+def test_flow_spike_silent_on_steady_flow():
+    cum = [0]
+    for i in range(1, 26):
+        cum.append(cum[-1] + 5)
+    assert events.detect_flow_spike("금융투자", cum, events.CFG) == []
+
+
+def test_milestone_fires_exactly_on_mark():
+    out = events.detect_milestone("금융투자", 30, events.CFG)
+    assert len(out) == 1 and "30분" in out[0]["text"]
+    assert events.detect_milestone("금융투자", 31, events.CFG) == []

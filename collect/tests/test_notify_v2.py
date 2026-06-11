@@ -106,3 +106,16 @@ def test_no_spurious_new_high_when_baseline_has_higher_peak(tmp_path, monkeypatc
     _make_day(tmp_path, "2026-06-11", snaps)
     msg = notify.check_and_notify("2026-06-11", "kospi", data_root=root, test=True)
     assert msg is None or "신고가" not in msg
+
+
+def test_calibrate_replay_counts_events(tmp_path):
+    import calibrate
+    snaps = []
+    base = 0
+    for i in range(60):
+        base += 5 if i < 30 else -8  # 전반 매수 → 후반 매도 (확정전환 1회 기대)
+        snaps.append(_snap(f"2026-06-11T09:{i:02d}:00+09:00", 2650.0 + i * 0.5, 770.0, base))
+    _make_day(tmp_path, "2026-06-11", snaps)
+    report = calibrate.replay("2026-06-11", "kospi", data_root=tmp_path)
+    assert isinstance(report, dict)
+    assert report.get("확정전환", 0) >= 1

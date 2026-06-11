@@ -52,6 +52,12 @@ cd collect
 
 13개 테스트 (parse 7 + storage 6) 통과 기준.
 
+### 알림 v2 (events.py)
+매분 12종 감지기를 돌려 그 분의 이벤트를 1메시지로 통합 발송한다.
+`NOTIFY_EVENTS`(쉼표구분)로 감지기 on/off — 메시지 맨끝 `states:` 줄에서
+발사빈도를 보고 무용한 감지기를 솎아낸다. 임계값은 `events.CFG`,
+근거는 `python calibrate.py <date>`. 트리거 주체 기본 = 금융투자·외국인·연기금등.
+
 ## 의존성 (`requirements.txt`)
 
 - `requests` — KB 페이지 HTTP GET

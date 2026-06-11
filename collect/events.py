@@ -215,3 +215,12 @@ def detect_milestone(actor, streak, cfg):
         return [ev("마일스톤", "🎯", f"{actor} 지속매수 {streak}분 연속",
                    dedup=f"mile:{actor}:{streak}")]
     return []
+
+
+def detect_session(hhmm, session_done, header, cfg):
+    out = []
+    if not session_done.get("open") and hhmm >= "09:00":
+        out.append(ev("개장마감", "🔔", f"개장 — {header}", dedup="open"))
+    if not session_done.get("close") and hhmm >= "15:20":
+        out.append(ev("개장마감", "🔔", f"마감 임박 — {header}", dedup="close"))
+    return out

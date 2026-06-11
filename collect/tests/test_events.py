@@ -207,3 +207,20 @@ def test_individual_divergence_managed_sell_individual_buy():
     out = events.detect_individual_divergence(details, ["금융투자", "외국인", "연기금등"], events.CFG)
     assert len(out) == 1 and out[0]["kind"] == "개인디버전스"
     assert "개인 매수" in out[0]["text"]
+
+
+def test_session_open_fires_once():
+    done = {}
+    out = events.detect_session("09:01", done, "KOSPI 2,650.0 (+0.10%)", events.CFG)
+    assert len(out) == 1 and "개장" in out[0]["text"] and out[0]["dedup"] == "open"
+
+
+def test_session_close_fires_after_1520():
+    out = events.detect_session("15:21", {"open": True}, "KOSPI 2,650.0 (+0.10%)", events.CFG)
+    kinds = [e["dedup"] for e in out]
+    assert "close" in kinds
+
+
+def test_session_silent_when_already_done():
+    out = events.detect_session("15:25", {"open": True, "close": True}, "hdr", events.CFG)
+    assert out == []

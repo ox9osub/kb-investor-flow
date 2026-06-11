@@ -70,6 +70,7 @@ def test_confirmed_transition_fires_on_family_flip_with_drawdown():
     assert len(out) == 1
     assert out[0]["kind"] == "확정전환"
     assert "매도전환" in out[0]["text"]
+    assert out[0]["dedup"] == "confirm:금융투자"
 
 
 def test_confirmed_transition_suppressed_when_drawdown_too_small():
@@ -89,6 +90,15 @@ def test_provisional_transition_fires_before_official_catches_up():
     assert len(out) == 1
     assert out[0]["kind"] == "잠정전환"
     assert "매수전환?" in out[0]["text"]
+    assert out[0]["dedup"] == "prov:금융투자"
+
+
+def test_drawdown_ok_window_excludes_old_extremes():
+    # 옛 고점(200)은 W=3 윈도우 밖 → 최근 3분 [120,118,116]만 봄 → 4 하락뿐 → False
+    cum = [0, 100, 200, 120, 118, 116]
+    assert events._drawdown_ok(-1, cum, D=30, W=3) is False
+    # 같은 데이터, W=20이면 옛 고점 200 포함 → 84 하락 → True
+    assert events._drawdown_ok(-1, cum, D=30, W=20) is True
 
 
 def test_provisional_not_refired_same_regime():

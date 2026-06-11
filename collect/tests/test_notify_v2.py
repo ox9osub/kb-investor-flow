@@ -119,3 +119,16 @@ def test_calibrate_replay_counts_events(tmp_path):
     report = calibrate.replay("2026-06-11", "kospi", data_root=tmp_path)
     assert isinstance(report, dict)
     assert report.get("확정전환", 0) >= 1
+
+
+def test_old_format_state_no_spurious_new_high(tmp_path, monkeypatch):
+    # 중도 배포 시뮬레이션: date==오늘이지만 day_high/day_low 없는 구형 상태파일
+    state_file = tmp_path / ".state.json"
+    state_file.write_text(json.dumps({"date": "2026-06-11",
+                                      "labels": {"금융투자": "중립"}}, ensure_ascii=False),
+                          encoding="utf-8")
+    monkeypatch.setattr(notify, "_STATE_FILE", state_file)
+    snaps = [_snap(f"2026-06-11T10:0{i}:00+09:00", 2650.0, 770.0, 0) for i in range(4)]
+    root = _make_day(tmp_path, "2026-06-11", snaps)
+    msg = notify.check_and_notify("2026-06-11", "kospi", data_root=root, test=True)
+    assert msg is None or "신고가" not in msg

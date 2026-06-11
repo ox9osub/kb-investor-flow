@@ -328,6 +328,10 @@ def check_and_notify(date=None, market="kospi", data_root=_DATA_REPO_ROOT, test=
     header = _index_header(snaps)
     raw = []
 
+    if cur_series and market not in day_high:   # 구형 상태파일/중도배포 첫 분: 진고점 누락 → 시드
+        day_high[market] = max(cur_series)
+        day_low[market] = min(cur_series)
+
     if not fresh_day:
         for a in managed:
             if "확정전환" in enabled:

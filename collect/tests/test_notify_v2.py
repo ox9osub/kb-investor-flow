@@ -92,3 +92,17 @@ def test_out_of_session_returns_none(tmp_path, monkeypatch):
     snaps = [_snap("2026-06-11T08:50:00+09:00", 2650.0, 770.0, 0)]
     root = _make_day(tmp_path, "2026-06-11", snaps)
     assert notify.check_and_notify("2026-06-11", "kospi", data_root=root, test=True) is None
+
+
+def test_no_spurious_new_high_when_baseline_has_higher_peak(tmp_path, monkeypatch):
+    monkeypatch.setattr(notify, "_STATE_FILE", tmp_path / ".state.json")
+    # 기준선에 이미 2660 진고점이 있고 마지막은 2650으로 내려온 상태
+    prices = [2650.0, 2655.0, 2660.0, 2655.0, 2650.0, 2650.0]
+    snaps = [_snap(f"2026-06-11T09:0{i}:00+09:00", prices[i], 770.0, 0) for i in range(6)]
+    root = _make_day(tmp_path, "2026-06-11", snaps)
+    notify.check_and_notify("2026-06-11", "kospi", data_root=root, test=True)  # 기준선
+    # 다음 분 2658 — 마지막(2650)보다 높지만 당일 진고점(2660)보단 낮음 → 신고가 아님
+    snaps.append(_snap("2026-06-11T09:06:00+09:00", 2658.0, 770.0, 0))
+    _make_day(tmp_path, "2026-06-11", snaps)
+    msg = notify.check_and_notify("2026-06-11", "kospi", data_root=root, test=True)
+    assert msg is None or "신고가" not in msg

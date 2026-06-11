@@ -21,6 +21,7 @@ requests/bs4만 둠). 로직·파라미터는 trend.classify와 일치하며,
 from __future__ import annotations
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 
 _THIS_DIR = Path(__file__).resolve().parent
@@ -246,7 +247,6 @@ def _index_header(snaps):
 
 
 def _minutes_between(a, b):
-    from datetime import datetime
     return abs((datetime.fromisoformat(b) - datetime.fromisoformat(a)).total_seconds()) / 60
 
 
@@ -368,9 +368,9 @@ def check_and_notify(date=None, market="kospi", data_root=_DATA_REPO_ROOT, test=
         if e["dedup"] == "close":
             session_done["close"] = True
     if cur_series:
-        c = cur_series[-1]
-        day_high[market] = max(day_high.get(market, c), c)
-        day_low[market] = min(day_low.get(market, c), c)
+        hi, lo = max(cur_series), min(cur_series)
+        day_high[market] = max(day_high.get(market, hi), hi)
+        day_low[market] = min(day_low.get(market, lo), lo)
 
     heartbeat = (not fired and not fresh_day and "하트비트" in enabled and
                  (last_alert is None or _minutes_between(last_alert, ts) >= cfg["heartbeat_min"]))

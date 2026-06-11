@@ -109,3 +109,59 @@ def detect_provisional_transition(actor, detail, prev_fast, cum, cfg):
     base = "매수전환" if e == 1 else "매도전환"
     text = f"{actor}  {detail['official']}→{base}?  ({detail['pace']:+.0f}억)"
     return [ev("잠정전환", LABEL_ICON[base], text, dedup=f"prov:{actor}")]
+
+
+def detect_index_window(market, series, cfg):
+    n = cfg["win_n"]
+    if len(series) <= n:
+        return []
+    base, cur = series[-n - 1], series[-1]
+    if not base:
+        return []
+    pct = (cur - base) / base * 100
+    if abs(pct) < cfg["win_pct"]:
+        return []
+    icon = "📈" if pct > 0 else "📉"
+    return [ev("지수윈도우", icon, f"{market.upper()} {n}분 {pct:+.2f}%",
+               dedup=f"win:{market}:{'up' if pct > 0 else 'dn'}")]
+
+
+def detect_index_spike(market, series, cfg):
+    if len(series) < 2:
+        return []
+    base, cur = series[-2], series[-1]
+    if not base:
+        return []
+    pct = (cur - base) / base * 100
+    if abs(pct) < cfg["spike_pct"]:
+        return []
+    icon = "⚡"
+    return [ev("지수스파이크", icon, f"{market.upper()} 1분 {pct:+.2f}%",
+               dedup=f"spike:{market}")]
+
+
+def detect_new_high_low(market, cur, day_high, day_low, cfg):
+    eps = cfg["hilo_eps"]
+    if day_high is None or cur > day_high + eps:
+        return [ev("신고저", "🏁", f"{market.upper()} 당일 신고가 {cur:,.1f}",
+                   dedup=f"hi:{market}")]
+    if day_low is None or cur < day_low - eps:
+        return [ev("신고저", "🏁", f"{market.upper()} 당일 신저가 {cur:,.1f}",
+                   dedup=f"lo:{market}")]
+    return []
+
+
+def detect_index_divergence(kospi_series, kosdaq_series, cfg):
+    n = cfg["win_n"]
+    if len(kospi_series) <= n or len(kosdaq_series) <= n:
+        return []
+
+    def pct(s):
+        b = s[-n - 1]
+        return (s[-1] - b) / b * 100 if b else 0.0
+
+    pk, pq = pct(kospi_series), pct(kosdaq_series)
+    if pk * pq < 0 and abs(pk - pq) >= cfg["idxdiv_pct"] * 2:
+        return [ev("지수디버전스", "↔️", f"코스피 {pk:+.2f}% ↔ 코스닥 {pq:+.2f}%",
+                   dedup="idxdiv")]
+    return []

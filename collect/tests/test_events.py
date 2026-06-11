@@ -107,3 +107,44 @@ def test_provisional_not_refired_same_regime():
     out = events.detect_provisional_transition("금융투자", detail, prev_fast=1,
                                                cum=cum, cfg=events.CFG)
     assert out == []  # prev_fast가 이미 +1 → 같은 국면, 재발사 안 함
+
+
+def test_index_window_fires_above_threshold():
+    series = [100.0] * 6 + [100.4]  # 직전 5분前 100.0 → 100.4 = +0.40%
+    out = events.detect_index_window("kospi", series, events.CFG)
+    assert len(out) == 1 and out[0]["kind"] == "지수윈도우"
+    assert "+0.40%" in out[0]["text"]
+
+
+def test_index_window_silent_below_threshold():
+    series = [100.0] * 6 + [100.1]  # +0.10% < 0.30%
+    assert events.detect_index_window("kospi", series, events.CFG) == []
+
+
+def test_index_spike_fires_on_one_minute_move():
+    series = [100.0, 100.0, 100.25]  # 직전 100.0 → 100.25 = +0.25%
+    out = events.detect_index_spike("kosdaq", series, events.CFG)
+    assert len(out) == 1 and "+0.25%" in out[0]["text"]
+
+
+def test_new_high_records_and_fires():
+    out = events.detect_new_high_low("kospi", 2700.0, day_high=2680.0,
+                                     day_low=2650.0, cfg=events.CFG)
+    assert len(out) == 1 and "신고가" in out[0]["text"]
+
+
+def test_new_low_fires():
+    out = events.detect_new_high_low("kospi", 2640.0, day_high=2680.0,
+                                     day_low=2650.0, cfg=events.CFG)
+    assert len(out) == 1 and "신저가" in out[0]["text"]
+
+
+def test_new_high_low_silent_within_range():
+    assert events.detect_new_high_low("kospi", 2665.0, 2680.0, 2650.0, events.CFG) == []
+
+
+def test_index_divergence_fires_on_opposite_moves():
+    kospi = [100.0] * 6 + [100.3]   # +0.30%
+    kosdaq = [100.0] * 6 + [99.7]   # -0.30%
+    out = events.detect_index_divergence(kospi, kosdaq, events.CFG)
+    assert len(out) == 1 and out[0]["kind"] == "지수디버전스"

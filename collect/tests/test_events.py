@@ -148,3 +148,14 @@ def test_index_divergence_fires_on_opposite_moves():
     kosdaq = [100.0] * 6 + [99.7]   # -0.30%
     out = events.detect_index_divergence(kospi, kosdaq, events.CFG)
     assert len(out) == 1 and out[0]["kind"] == "지수디버전스"
+
+
+def test_index_spike_silent_below_threshold():
+    series = [100.0, 100.0, 100.1]  # +0.10% < spike_pct 0.20%
+    assert events.detect_index_spike("kospi", series, events.CFG) == []
+
+
+def test_index_divergence_silent_when_same_direction():
+    kospi = [100.0] * 6 + [100.3]   # +0.30%
+    kosdaq = [100.0] * 6 + [100.2]  # +0.20% (같은 방향) → 침묵
+    assert events.detect_index_divergence(kospi, kosdaq, events.CFG) == []

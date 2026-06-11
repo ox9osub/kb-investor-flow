@@ -4,6 +4,8 @@
 CFG(임계값) 튜닝 근거용. 누적 데이터 파일의 스냅샷을 1분씩 늘려가며
 notify.check_and_notify와 동일한 감지 로직을 재현, kind별 카운트를 낸다.
 사용:  python calibrate.py 2026-06-01 --market kospi
+
+첫 스텝(n=2)은 기준선 확립 없이 감지기를 돌리므로, 오케스트레이터(fresh_day 침묵) 대비 시작 1~2회 과잉 계수될 수 있다 — 임계값 비교 목적엔 무방.
 """
 from __future__ import annotations
 import json
@@ -23,9 +25,9 @@ def replay(date, market="kospi", data_root=_DATA, cfg=None):
     snaps = full["snapshots"]
     counts: dict = {}
     prev_labels, prev_fast, fired_map = {}, {}, {}
-    day_high, day_low, streak, session_done, last_alert = {}, {}, {}, {}, None
+    day_high, day_low, streak, session_done = {}, {}, {}, {}
     managed = notify._monitor_actors()
-    enabled = events.enabled_events()
+    # 캘리브레이션은 NOTIFY_EVENTS와 무관하게 모든 감지기를 돌린다.
 
     for n in range(2, len(snaps) + 1):
         sub = snaps[:n]

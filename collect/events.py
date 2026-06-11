@@ -19,7 +19,7 @@ EVENT_KINDS = [
 LABEL_ICON = {"지속매수": "🔥", "매수전환": "❤️", "매수둔화": "🔸", "혼조": "💤",
               "중립": "◽", "매도둔화": "🔹", "매도전환": "💙", "지속매도": "💦"}
 
-# 동일 dedup 키가 이 분(分) 안에 또 떠도 억제. 미등록 kind = 0(항상 허용).
+# 동일 dedup 키가 이 분(分) 안에 또 떠도 억제. 0 = 쿨다운 없음, 미등록 kind도 0(항상 허용).
 COOLDOWN = {
     "지수윈도우": 5, "지수스파이크": 3, "신고저": 0, "flow급증": 5,
     "정렬": 10, "개인디버전스": 10, "지수디버전스": 10,
@@ -30,7 +30,7 @@ CFG = {
     "heartbeat_min": 5,
     "win_n": 5, "win_pct": 0.30,
     "spike_pct": 0.20,
-    "ratchet_D": 30.0, "ratchet_W": 20,
+    "ratchet_D": 30.0, "ratchet_W": 20.0,
     "hilo_eps": 0.5,
     "flow_z": 2.5, "flow_win": 20,
     "align_eps": 1.0, "indiv_eps": 1.0,
@@ -43,11 +43,13 @@ SELL_FAM = {"지속매도", "매도전환", "매도둔화"}
 
 
 def ev(kind: str, icon: str, text: str, dedup: str | None = None) -> dict:
+    if kind not in EVENT_KINDS:
+        raise ValueError(f"ev(): unknown kind {kind!r}")
     return {"kind": kind, "icon": icon, "text": text,
             "rank": EVENT_KINDS.index(kind), "dedup": dedup or kind}
 
 
-def enabled_events() -> list:
+def enabled_events() -> list[str]:
     env = os.environ.get("NOTIFY_EVENTS", "").strip()
     if not env:
         return list(EVENT_KINDS)
@@ -55,7 +57,7 @@ def enabled_events() -> list:
     return [k for k in EVENT_KINDS if k in picked]
 
 
-def render_roster(enabled: list, fired: set) -> str:
+def render_roster(enabled: list[str], fired: set[str]) -> str:
     fr = [k for k in enabled if k in fired]
     qt = [k for k in enabled if k not in fired]
     roster = " ".join("●" + k for k in fr)

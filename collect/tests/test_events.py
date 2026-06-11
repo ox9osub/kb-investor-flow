@@ -37,3 +37,14 @@ def test_render_roster_marks_fired_first():
 def test_render_roster_all_quiet_has_no_separator():
     out = events.render_roster(["확정전환", "잠정전환"], set())
     assert out == "states: 확정전환 잠정전환"
+
+
+def test_ev_custom_dedup_flows_through():
+    e = events.ev("flow급증", "💥", "금융투자 분당 +80억 급증 (z+3.0)", dedup="flow:금융투자")
+    assert e["dedup"] == "flow:금융투자"
+
+
+def test_ev_unknown_kind_raises():
+    import pytest
+    with pytest.raises(ValueError):
+        events.ev("없는종류", "x", "y")

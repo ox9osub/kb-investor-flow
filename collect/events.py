@@ -65,3 +65,47 @@ def render_roster(enabled: list[str], fired: set[str]) -> str:
         roster += " · "
     roster += " ".join(qt)
     return "states: " + roster
+
+
+def _fam(label: str) -> int:
+    return 1 if label in BUY_FAM else (-1 if label in SELL_FAM else 0)
+
+
+def _drawdown_ok(direction: int, cum, D: float, W: int) -> bool:
+    """direction +1=매수전환(저점대비 D 회복), -1=매도전환(고점대비 D 하락)."""
+    if not cum:
+        return False
+    window = cum[-W:]
+    last = cum[-1]
+    if direction == -1:
+        return (max(window) - last) >= D
+    if direction == 1:
+        return (last - min(window)) >= D
+    return False
+
+
+def detect_confirmed_transition(actor, detail, prev_official, cum, cfg):
+    cur = detail["official"]
+    cf = _fam(cur)
+    if cf == 0 or prev_official is None:
+        return []
+    if cf == _fam(prev_official):
+        return []
+    if not _drawdown_ok(cf, cum, cfg["ratchet_D"], cfg["ratchet_W"]):
+        return []
+    label = "매수전환" if cf == 1 else "매도전환"
+    text = f"{actor}  {prev_official}→{label}  ({detail['pace']:+.0f}억)"
+    return [ev("확정전환", LABEL_ICON[label], text, dedup=f"confirm:{actor}")]
+
+
+def detect_provisional_transition(actor, detail, prev_fast, cum, cfg):
+    e = detail["e_dir"]
+    if e == 0 or e == _fam(detail["official"]):
+        return []                      # 방향 없음/official이 이미 따라잡음
+    if e == prev_fast:
+        return []                      # 같은 국면 — 이미 잠정 발사함
+    if not _drawdown_ok(e, cum, cfg["ratchet_D"], cfg["ratchet_W"]):
+        return []
+    base = "매수전환" if e == 1 else "매도전환"
+    text = f"{actor}  {detail['official']}→{base}?  ({detail['pace']:+.0f}억)"
+    return [ev("잠정전환", LABEL_ICON[base], text, dedup=f"prov:{actor}")]

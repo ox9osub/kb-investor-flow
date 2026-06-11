@@ -48,3 +48,52 @@ def test_ev_unknown_kind_raises():
     import pytest
     with pytest.raises(ValueError):
         events.ev("없는종류", "x", "y")
+
+
+def test_drawdown_ok_sell_requires_drop_from_recent_high():
+    cum = [0, 50, 100, 150, 200, 198]  # 고점 200, 현재 198 → 2 하락
+    assert events._drawdown_ok(-1, cum, D=30, W=20) is False
+    cum2 = [0, 50, 100, 150, 200, 160]  # 40 하락 → 통과
+    assert events._drawdown_ok(-1, cum2, D=30, W=20) is True
+
+
+def test_drawdown_ok_buy_requires_rise_from_recent_low():
+    cum = [0, -50, -100, -150, -120]  # 저점 -150, 현재 -120 → 30 회복
+    assert events._drawdown_ok(1, cum, D=30, W=20) is True
+    assert events._drawdown_ok(1, [0, -50, -100, -150, -145], D=30, W=20) is False
+
+
+def test_confirmed_transition_fires_on_family_flip_with_drawdown():
+    detail = {"official": "지속매도", "pace": -40.0, "e_dir": -1}
+    cum = [0, 50, 100, 150, 200, 150, 110]  # 고점200 → 110, 90 하락(>D)
+    out = events.detect_confirmed_transition("금융투자", detail, "지속매수", cum, events.CFG)
+    assert len(out) == 1
+    assert out[0]["kind"] == "확정전환"
+    assert "매도전환" in out[0]["text"]
+
+
+def test_confirmed_transition_suppressed_when_drawdown_too_small():
+    # 계단 횡보 미세하락: official이 매도로 잠깐 바뀌어도 래칫 미통과 → 침묵
+    detail = {"official": "지속매도", "pace": -2.0, "e_dir": -1}
+    cum = [0, 50, 100, 150, 200, 199, 198, 197]  # 고점 대비 3 하락뿐
+    out = events.detect_confirmed_transition("금융투자", detail, "지속매수", cum, events.CFG)
+    assert out == []
+
+
+def test_provisional_transition_fires_before_official_catches_up():
+    # e_dir은 매수(+1)로 확정됐지만 official은 아직 매도계열 → 잠정 매수전환?
+    detail = {"official": "지속매도", "pace": 35.0, "e_dir": 1}
+    cum = [0, -50, -100, -150, -150, -110]  # 저점 -150 → -110, 40 회복(>D)
+    out = events.detect_provisional_transition("금융투자", detail, prev_fast=-1,
+                                               cum=cum, cfg=events.CFG)
+    assert len(out) == 1
+    assert out[0]["kind"] == "잠정전환"
+    assert "매수전환?" in out[0]["text"]
+
+
+def test_provisional_not_refired_same_regime():
+    detail = {"official": "지속매도", "pace": 35.0, "e_dir": 1}
+    cum = [0, -50, -100, -150, -150, -110]
+    out = events.detect_provisional_transition("금융투자", detail, prev_fast=1,
+                                               cum=cum, cfg=events.CFG)
+    assert out == []  # prev_fast가 이미 +1 → 같은 국면, 재발사 안 함

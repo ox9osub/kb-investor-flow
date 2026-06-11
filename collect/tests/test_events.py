@@ -199,3 +199,11 @@ def test_milestone_fires_exactly_on_mark():
     out = events.detect_milestone("금융투자", 30, events.CFG)
     assert len(out) == 1 and "30분" in out[0]["text"]
     assert events.detect_milestone("금융투자", 31, events.CFG) == []
+
+
+def test_individual_divergence_managed_sell_individual_buy():
+    details = {"금융투자": {"e_dir": -1}, "외국인": {"e_dir": -1},
+               "연기금등": {"e_dir": -1}, "개인": {"e_dir": 1}}
+    out = events.detect_individual_divergence(details, ["금융투자", "외국인", "연기금등"], events.CFG)
+    assert len(out) == 1 and out[0]["kind"] == "개인디버전스"
+    assert "개인 매수" in out[0]["text"]

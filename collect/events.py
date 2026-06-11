@@ -205,7 +205,8 @@ def detect_flow_spike(actor, cum, cfg):
         z = (last - mean) / sd
     if abs(z) < cfg["flow_z"]:
         return []
-    return [ev("flow급증", "💥", f"{actor} 분당 {last:+.0f}억 급증 (z{z:+.1f})",
+    ztxt = f"{z:+.1f}" if abs(z) != float("inf") else (">99" if z > 0 else "<-99")
+    return [ev("flow급증", "💥", f"{actor} 분당 {last:+.0f}억 급증 (z{ztxt})",
                dedup=f"flow:{actor}")]
 
 

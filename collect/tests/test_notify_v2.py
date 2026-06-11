@@ -26,3 +26,8 @@ def test_classify_full_neutral_on_flat():
     full = notify.classify_full(cum)
     assert full["e_dir"] == 0
     assert full["official"] in {"중립", "혼조"}
+
+
+def test_classify_full_e_dir_negative_on_sustained_selling():
+    cum = [0, -10, -25, -45, -70, -100, -135, -175]  # 단조 강한 매도
+    assert notify.classify_full(cum)["e_dir"] == -1

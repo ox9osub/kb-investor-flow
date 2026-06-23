@@ -29,6 +29,10 @@ document.addEventListener("DOMContentLoaded", () => {
 // 분 파일이 올라오기 직전(:00~:04.99)에 해당 분 파일을 요청하면 안 되는 컷오프(초).
 const MINUTE_FILE_CUTOFF_SEC = 5;
 
+// 수집 데몬은 15:40 KST에 멈춘다(collect/daemon.py TRADING_END_MIN과 동일). 그 이후 분은
+// 파일이 영영 안 생기므로, 백필 상한을 여기에 묶어 마감 후 404 폭주를 막는다.
+const TRADING_END_MIN = 15 * 60 + 40;  // 15:40
+
 // 분 파일은 매 분 경계에 publish된다. 페이지 로드 시점 기준 60초 간격(setInterval)으로
 // 받으면 분 경계와 어긋나 직전 분 파일을 받거나 신선도가 들쭉날쭉해진다.
 // 그래서 매 분 :05초(파일이 올라온 직후)에 정렬해 새로고침한다.
@@ -39,9 +43,10 @@ function scheduleMinuteRefresh() {
   if (delay <= 0) delay += 60_000;
   setTimeout(() => {
     refresh();
-    setInterval(refresh, REFRESH_MS);  // 이후 정확히 매 분 :05
+    refreshTimer = setInterval(refresh, REFRESH_MS);  // 이후 정확히 매 분 :05
   }, delay);
 }
+let refreshTimer = null;  // 자동 새로고침 interval id (마감 후 중단용)
 
 function initDatePicker() {
   const el = document.getElementById("datePicker");
@@ -106,6 +111,13 @@ async function refresh() {
   updateHeader(data.updated_at);
   const note = document.getElementById("refreshNote");
   note.textContent = isToday ? "자동 새로고침 60s" : `선택일: ${date} (과거)`;
+
+  // 오늘 보기에서 마감(15:40)을 지났으면 더 받을 데이터가 없다 — 자동 새로고침을 멈춰
+  // SHA 조회·누적·분 파일 요청을 전부 중단한다(과거 날짜는 애초에 폴링하지 않음).
+  if (isToday && hhmmToMinutes(nowKstHHMM()) > TRADING_END_MIN) {
+    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+    note.textContent = "장 마감 — 자동 새로고침 중단";
+  }
 }
 
 // raw·jsdelivr 모두 ?t= 쿼리스트링을 캐시 키에서 무시하므로, 누적 파일은 CDN 캐시로
@@ -178,6 +190,8 @@ async function fillRecentMinutes(data, date) {
   // 요청해 봐야 404(아직 없음)라 한 분 늦게 채워진다 — 현재 분을 한도에서 뺀다.
   let nowMin = hhmmToMinutes(nowKstHHMM());
   if (nowKstSeconds() < MINUTE_FILE_CUTOFF_SEC) nowMin -= 1;
+  // 마감(15:40) 이후엔 새 분 파일이 없다 — 상한을 종료 시각에 묶어 미래 분 404를 차단.
+  if (nowMin > TRADING_END_MIN) nowMin = TRADING_END_MIN;
 
   const wanted = [];
   for (let m = lastMin + 1; m <= nowMin && wanted.length < MINUTE_FILL_MAX; m++) {

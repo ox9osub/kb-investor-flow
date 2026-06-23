@@ -13,10 +13,27 @@ document.addEventListener("DOMContentLoaded", () => {
   initCharts();
   initTabs();
   initDatePicker();
-  refresh();
-  setInterval(refresh, REFRESH_MS);
+  refresh();               // 첫 로딩 시 즉시 1회
+  scheduleMinuteRefresh(); // 이후 매 분 :05초에 새로고침
   window.addEventListener("resize", resizeAll);
 });
+
+// 분 파일이 올라오기 직전(:00~:04.99)에 해당 분 파일을 요청하면 안 되는 컷오프(초).
+const MINUTE_FILE_CUTOFF_SEC = 5;
+
+// 분 파일은 매 분 경계에 publish된다. 페이지 로드 시점 기준 60초 간격(setInterval)으로
+// 받으면 분 경계와 어긋나 직전 분 파일을 받거나 신선도가 들쭉날쭉해진다.
+// 그래서 매 분 :05초(파일이 올라온 직후)에 정렬해 새로고침한다.
+function scheduleMinuteRefresh() {
+  const now = new Date();
+  // 다음 "HH:MM:05.000"까지 남은 ms. 이미 :05를 지났으면 다음 분의 :05로.
+  let delay = MINUTE_FILE_CUTOFF_SEC * 1000 - now.getSeconds() * 1000 - now.getMilliseconds();
+  if (delay <= 0) delay += 60_000;
+  setTimeout(() => {
+    refresh();
+    setInterval(refresh, REFRESH_MS);  // 이후 정확히 매 분 :05
+  }, delay);
+}
 
 function initDatePicker() {
   const el = document.getElementById("datePicker");
@@ -123,7 +140,10 @@ async function fillRecentMinutes(data, date) {
   const snaps = data.snapshots;
   const lastTs = snaps.length ? snaps[snaps.length - 1].ts : null;
   const lastMin = lastTs ? hhmmToMinutes(lastTs.slice(11, 16)) : -1;
-  const nowMin = hhmmToMinutes(nowKstHHMM());
+  // 현재 분 파일은 :05초 이후에만 publish된다. 그 전(:00~:04.99)에는 현재 분을
+  // 요청해 봐야 404(아직 없음)라 한 분 늦게 채워진다 — 현재 분을 한도에서 뺀다.
+  let nowMin = hhmmToMinutes(nowKstHHMM());
+  if (nowKstSeconds() < MINUTE_FILE_CUTOFF_SEC) nowMin -= 1;
 
   const wanted = [];
   for (let m = lastMin + 1; m <= nowMin && wanted.length < MINUTE_FILL_MAX; m++) {
@@ -160,6 +180,12 @@ function nowKstHHMM() {
   return new Date().toLocaleTimeString("en-GB", {
     timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false,
   });  // "10:47"
+}
+
+function nowKstSeconds() {
+  return Number(new Date().toLocaleTimeString("en-GB", {
+    timeZone: "Asia/Seoul", second: "2-digit", hour12: false,
+  }));  // "07" → 7
 }
 
 function todayKstDateStr() {

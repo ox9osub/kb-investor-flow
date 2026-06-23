@@ -5,6 +5,14 @@ const USE_MOCK = false;
 // raw는 ?t= + cache:no-store 를 존중하므로 매 분 최신 스냅샷을 받는다.
 const RAW_BASE = "https://raw.githubusercontent.com/ox9osub/kb-investor-flow/data";
 
+// 누적 파일 1분 신선도(오늘 보기 한정): data 브랜치 HEAD 커밋 SHA를 받아 jsDelivr의 불변
+// @sha 경로로 받는다. @sha URL은 커밋마다 고유 → CDN 캐시를 우회한다(브랜치 URL은 ?t=를
+// 무시해 12h 캐시되므로 못 씀). SHA 조회(api.github.com)는 비인증 60회/시간 한도가 있어,
+// 403/에러/CORS 시 기존 raw 경로(≤5분 캐시)로 폴백한다 — 되면 fresh, 안 되면 현상 유지.
+const GH_OWNER_REPO = "ox9osub/kb-investor-flow";
+const GH_BRANCH = "data";
+const JSDELIVR_BASE = `https://cdn.jsdelivr.net/gh/${GH_OWNER_REPO}`;
+
 const charts = { kospi: {}, kosdaq: {} };
 let currentMarket = "kospi";
 let selectedDate = todayKstDateStr();  // 지금 보고 있는 날짜 (기본: 오늘 KST)
@@ -106,13 +114,39 @@ async function refresh() {
 // 메우는 개수는 캐시 TTL(약 5분)에 묶여 최대 ~6개 — 장 후반에도 늘지 않는다.
 const MINUTE_FILL_MAX = 8;
 
+// data 브랜치 HEAD 커밋 SHA를 반환. 한도 초과(403)·네트워크·CORS 실패 시 null → 호출부 폴백.
+async function getLatestSha() {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${GH_OWNER_REPO}/commits/${GH_BRANCH}`, {
+      headers: { Accept: "application/vnd.github.sha" },  // 본문에 SHA만 plain text로 받음
+      cache: "no-store",
+    });
+    if (!r.ok) return null;
+    const sha = (await r.text()).trim();
+    return /^[0-9a-f]{40}$/.test(sha) ? sha : null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchData(date, isToday) {
   if (USE_MOCK) {
     const r = await fetch("assets/mock-data.json", { cache: "no-store" });
     return r.ok ? r.json() : null;
   }
 
-  const r = await fetch(`${RAW_BASE}/data/${date}.json?t=${Date.now()}`, { cache: "no-store" });
+  // 오늘 보기만 jsDelivr @sha(fresh) 시도 — 과거 날짜는 정적 완성본이라 한도를 쓸 이유가 없음.
+  let r = null;
+  if (isToday) {
+    const sha = await getLatestSha();
+    if (sha) {
+      const jr = await fetch(`${JSDELIVR_BASE}@${sha}/data/${date}.json`);  // 불변 URL → 캐시 OK
+      if (jr.ok) r = jr;  // jsDelivr 미러 지연 등으로 !ok면 아래 raw로 폴백
+    }
+  }
+  if (!r) {
+    r = await fetch(`${RAW_BASE}/data/${date}.json?t=${Date.now()}`, { cache: "no-store" });
+  }
   if (!r.ok) return null;
   const data = await r.json();
 

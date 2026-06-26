@@ -67,11 +67,16 @@ def collect_once(dry_run: bool = False, skip_push: bool = False) -> None:
     if skip_push:
         return
 
-    git_sync.commit_and_push(
-        repo_dir=_DATA_REPO_ROOT,
-        relpath=[rel, minute_rel],
-        message=f"data: {date} {ts[11:19]} KST",
-    )
+    # git push 실패(401/네트워크 등)는 수집 사이클을 깨면 안 됨 — 파일은 이미 저장됨.
+    # 미푸시 커밋은 로컬에 쌓여 다음 성공시 함께 올라간다.
+    try:
+        git_sync.commit_and_push(
+            repo_dir=_DATA_REPO_ROOT,
+            relpath=[rel, minute_rel],
+            message=f"data: {date} {ts[11:19]} KST",
+        )
+    except Exception as e:
+        print(f"[git] push deferred (data saved locally): {e}", flush=True)
 
 
 def main() -> None:
